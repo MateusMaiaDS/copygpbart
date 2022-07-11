@@ -3,14 +3,14 @@
 # Calculate Tree Prior
 
 # Function to calculate the tree complete conditional using BART model
-tree_complete_conditional_bart <- function(x,
+tree_complete_conditional_bart <- function(x_train,
                                            residuals_values,
                                            tree,
                                            tau_mu,
                                            tau) {
 
   # Getting the number of observations of the data
-  n <- nrow(x)
+  n <- nrow(x_train)
 
   # Selecting the terminal nodes
   terminal_nodes <- tree[names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))]
@@ -20,12 +20,12 @@ tree_complete_conditional_bart <- function(x,
 
   # Picking each node size
   nodes_size <- vapply(terminal_nodes, function(x) {
-    length(x$observations_index)
+    length(x$train_observations_index)
   }, numeric(1))
 
   # Retrieving Residuals terminal nodes
   residuals_terminal_nodes <- lapply(terminal_nodes, function(x) {
-    residuals_values[x$observations_index]
+    residuals_values[x$train_observations_index]
   })
 
   # Defining RT_Omega_I_R
@@ -48,7 +48,7 @@ tree_complete_conditional_bart <- function(x,
 
 # Update \mu using the BART simple version
 update_mu_bart <- function(tree,
-                           x,
+                           x_train,
                            tau,
                            tau_mu,
                            residuals,
@@ -62,12 +62,12 @@ update_mu_bart <- function(tree,
 
   # Picking each node size
   nodes_size <- vapply(terminal_nodes, function(x) {
-    length(x$observations_index)
+    length(x$train_observations_index)
   }, numeric(1))
 
   # Residuals terminal nodes
   residuals_terminal_nodes_sum <- vapply(terminal_nodes, function(node) {
-    sum(residuals[node$observations_index])
+    sum(residuals[node$train_observations_index])
   }, numeric(1))
 
   # Remember that S = n_node*tau
@@ -93,10 +93,10 @@ update_mu_bart <- function(tree,
     return(tree)
 }
 
-update_predictions_bart <- function(tree, x) {
+update_predictions_bart <- function(tree, x_train) {
 
   # New g (new vector prediction for g)
-  predictions_new <- rep(NA, nrow(x))
+  predictions_new <- rep(NA, nrow(x_train))
 
   # Selecting terminal nodes names
   names_terminal_nodes <- names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))

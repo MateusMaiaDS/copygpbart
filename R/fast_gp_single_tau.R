@@ -80,7 +80,7 @@ gp_main_sample <- function(x_train, y_train, x_star, tau,
     v <- if(K_diag) K_star/L else backsolve(L, K_star, transpose = TRUE, k = n_train)
     cov_star <- K_star_star - crossprod(v)
     
-    residuals_sample <- mapply(FUN=rMVN_var, mu_star, cov_star, SIMPLIFY = FALSE)
+    residuals_sample <- rMVN_var(mean = mu_star,Sigma = cov_star)
     
     # results <- list(mu_pred = residuals_sample, cov_pred = cov_star)
     results <- list(mu_pred = unlist(residuals_sample))

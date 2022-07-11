@@ -55,7 +55,7 @@ dh_cauchy <- function(x,location,sigma){
 }
 
 # Check the appendix of Linero SoftBART for more details
-update_tau_linero <- function(x,
+update_tau_linero <- function(x_train,
                               y,
                               y_hat,
                               curr_tau){
@@ -64,7 +64,7 @@ update_tau_linero <- function(x,
   # Calculating current sigma
   curr_sigma <- curr_tau^(-1/2)
 
-  sigma_naive <- naive_sigma(x = x,y = y)
+  sigma_naive <- naive_sigma(x = x_train,y = y)
 
   proposal_tau <- rgamma(n = 1,shape = 0.5*n+1,rate = 0.5*crossprod( (y-y_hat) ))
 
