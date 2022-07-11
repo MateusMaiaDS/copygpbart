@@ -345,7 +345,7 @@ get_prediction <- function(trees, x, single_tree = FALSE) {
 #' @return A 'gpbart_GPBART' model object,
 #' @export
 #'
-gp_bart <- function(x, y,
+gp_bart <- function(x_train, y_train, x_test,
                         number_trees = 2, # Setting the number of trees
                         node_min_size = 15, # Min node size,
                         mu = 0,
@@ -371,7 +371,7 @@ gp_bart <- function(x, y,
                         kappa = 0.5, bart_boolean = TRUE, bart_number_iter = 250) {
 
   # Changing the node_min_size
-  if(node_min_size>=nrow(x)){
+  if(node_min_size>=nrow(x_train)){
     stop("Node min size is greater than the number of observation")
   }
 
@@ -380,7 +380,8 @@ gp_bart <- function(x, y,
 
 
   # Creating the prediction elements to be stored
-  predictions = matrix(0, nrow = number_trees, ncol = nrow(x))
+  predictions = matrix(0, nrow = number_trees, ncol = nrow(x_train))
+  predictions_test = matrix(0, nrow = number_trees, ncol = nrow(x_test))
   predictions_list =  NULL
 
   # If there's only one covariate
@@ -391,14 +392,24 @@ gp_bart <- function(x, y,
 
   # Scaling the x
   if(x_scale){
-    x_original <- x
+    x_train_original <- x
+    x_test_original <- x_test
+    
     # Scaled version
-    xscale <- scale(x)
+    xscale <- scale(rbind(x_train,x_test))
+    
     mean_x <- attr(xscale,"scaled:center")
     sd_x <- attr(xscale,"scaled:scale")
-    x <- as.matrix(xscale)
+    
+    xscale_train <- scale(x_train,center = mean_x,scale = sd_x)
+    xscale_test <- scale(x_test, center = mean_x, scale = sd_x)
+    
+    x_train <- as.matrix(x_train)
+    x_test <- as.matrix(x_test)
+    
   } else{
-    x_original <- x
+    x_train_original <- x_train
+    x_test_original <- x_test
   }
 
   # Adjusting the kappa (avoiding the Infinity error)
@@ -447,7 +458,7 @@ gp_bart <- function(x, y,
     tau_mu_gpbart <- tau_mu_bart/kappa
 
     # Getting the optimal tau values
-    d_tau <- rate_tau(x = x,
+    d_tau <- rate_tau(x = x_train,
                       y = y_scale,
                       prob = prob_tau,
                       shape = a_tau)
@@ -469,7 +480,7 @@ gp_bart <- function(x, y,
     tau_mu_gpbart <- tau_mu_bart/kappa
 
     # Getting the optimal tau values
-    d_tau <- rate_tau(x = x,
+    d_tau <- rate_tau(x = x_train,
                       y = y_scale,
                       prob = prob_tau,
                       shape = a_tau)
@@ -526,11 +537,13 @@ gp_bart <- function(x, y,
   store_size <- (n_iter - burn)
   tree_store <- vector("list", store_size)
   tau_store <- c()
-  signal_pc_store <- matrix(NA, ncol = number_trees, nrow = store_size)
 
   y_hat_store <-
   y_hat_store_proposal <- matrix(NA, ncol = length(y), nrow = store_size)
 
+  
+  y_hat_test_store <- matrix(NA, ncol = nrow(x_test), nrow = store_size)
+  
   # Storing the likelihoods
   log_lik_store <-
   log_lik_store_fixed_tree <- rep(NA,store_size)
@@ -549,8 +562,10 @@ gp_bart <- function(x, y,
   # Creating the list of trees stumps
   for(i in seq_len(number_trees)) {
     # Creating the fixed two split trees
-    current_trees[[i]] <- stump(x = x, tau = tau, mu = mu)
-    current_trees_proposal[[i]] <- stump(x = x, tau = tau, mu =  mu)
+    current_trees[[i]] <- stump(x_train = x_train,
+                                x_test= x_test, mu = mu)
+    current_trees_proposal[[i]] <- stump(x_train = x_train,
+                                         x_test= x_test, mu = mu)
   }
 
   names(current_trees) <-
@@ -584,7 +599,8 @@ gp_bart <- function(x, y,
       curr <- (i - burn) / thin
       tree_store[[curr]] <- lapply(current_trees, remove_omega_plus_I_inv)
       tau_store[curr] <- tau
-
+      
+      # Getting the posterior for y_hat_train
       y_hat_store[curr, ] <- if(scale_boolean){
 
         # Getting the unnormalized version from tau
@@ -593,6 +609,15 @@ gp_bart <- function(x, y,
 
         colSums(predictions)
       }
+      
+      # Getting the posterior for y_hat_test 
+      y_hat_test_store[curr,] <- if(scale_boolean){
+        
+        unnormalize_bart(colSums(predictions_test), a = a_min, b = b_max)
+      } else {
+        colSums(predictions_test)
+      }
+      
       # Saving the current partial
       current_partial_residuals_list[[curr]] <- current_partial_residuals_matrix
 
@@ -655,7 +680,8 @@ gp_bart <- function(x, y,
 
         new_trees[[j]] <- update_tree_verb(
           tree = current_trees[[j]],
-          x = x,
+          x_train = x_train,
+          x_test = x_test,
           gp_variables = gp_variables,
           node_min_size = node_min_size,
           verb = verb, rotation = rotation, theta = theta
@@ -811,7 +837,8 @@ gp_bart <- function(x, y,
 
         new_trees[[j]] <- update_tree_verb(
           tree = current_trees[[j]],
-          x = x,
+          x_train = x_train,
+          x_test = x_test,
           gp_variables = gp_variables,
           node_min_size = node_min_size,
           verb = verb, rotation = rotation, theta = theta

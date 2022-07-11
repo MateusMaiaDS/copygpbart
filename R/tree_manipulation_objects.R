@@ -3,18 +3,19 @@
 # ==================================#
 
 # Create a stump
-stump <- function(x, tau, mu) {
+stump <- function(x_train, x_test, mu) {
   node <- list()
   node[["node_0"]] <- list(
-    node_number = 0, observations_index = seq_len(nrow(x)),
+    node_number = 0,
+    train_observations_index = seq_len(nrow(x_train)),
+    test_observations_index = seq_len(nrow(x_test)),
     depth_node = 0,
     node_var = NA,
     node_var_split = NA,
     left = 0,
     right = 0,
     parent_node = NA, # Retrieving the number of parent node
-    terminal = 1,
-    tau = tau
+    terminal = 1
   )
   node[["node_0"]]$mu <- mu
     return(node)
@@ -36,7 +37,9 @@ A <- function(theta) {
 # Objects to test the grow_project_tree_verb function
 # ==================================#
 
-grow_projection_tree <- function(tree, x, node_min_size, gp_variables, theta = NULL) {
+grow_projection_tree <- function(tree, x_train,
+                                 x_test,
+                                 node_min_size, gp_variables, theta = NULL) {
   
   # Controlling the "bad trees"
   bad_trees <- TRUE
@@ -51,14 +54,14 @@ grow_projection_tree <- function(tree, x, node_min_size, gp_variables, theta = N
     # Returning the Tree if there's no node to grow
     if(sum(vapply(new_tree, function(x) {
       # This condition will see if the terminal nodes have at least more than 2* the min node size
-      x$terminal == 1 && length(x$observations_index) > 2 * node_min_size
+      x$terminal == 1 && length(x$train_observations_index) > 2 * node_min_size
     }, logical(1))) == 0) {
       return(tree)
     }
     
     # Selecting the terminal nodes
     nodes_to_grow_names <- names(new_tree[vapply(new_tree, function(x) {
-      (x$terminal == 1) && (length(x$observations_index) > 2 * node_min_size)
+      (x$terminal == 1) && (length(x$train_observations_index) > 2 * node_min_size)
     }, logical(1))])
     
     # Selecting one terminal node randomly 
@@ -86,17 +89,23 @@ grow_projection_tree <- function(tree, x, node_min_size, gp_variables, theta = N
     }
     
     # Rotated Lon and Lat
-    rotated_x <- tcrossprod(A(theta), x[, node_var_pair,drop = FALSE])
-    rownames(rotated_x) <- node_var_pair
+    rotated_x_train <- tcrossprod(A(theta), x_train[, node_var_pair,drop = FALSE])
+    rotated_x_test <- tcrossprod(A(theta), x_test[, node_var_pair,drop = FALSE])
+    
+    rownames(rotated_x_train) <- node_var_pair
+    rownames(rotated_x_test) <- node_var_pair
     
     # Selecting the rotated var split
-    node_var_split <- sample(sort(rotated_x[node_var, ]), size = 1)
+    node_var_split <- sample(sort(rotated_x_train[node_var, ]), size = 1)
     
-    # Creating the left observations
-    left_node_split <- current_node$observations_index[which(rotated_x[node_var, current_node$observations_index]  < node_var_split)] # Selecting the left node
+    # Creating the left/right observations (train)
+    train_left_node_split <- current_node$train_observations_index[which(rotated_x_train[node_var, current_node$train_observations_index]  < node_var_split)] # Selecting the left node
+    train_right_node_split <- current_node$train_observations_index[which(rotated_x_train[node_var, current_node$train_observations_index] >= node_var_split)] # Selecting the right node
     
-    # Creating the right observations
-    right_node_split <- current_node$observations_index[which(rotated_x[node_var, current_node$observations_index] >= node_var_split)] # Selecting the right node
+    # Creating the left/right observations (test)
+    test_left_node_split <- current_node$test_observations_index[which(rotated_x_test[node_var, current_node$test_observations_index]  < node_var_split)] # Selecting the left node
+    test_right_node_split <- current_node$test_observations_index[which(rotated_x_test[node_var, current_node$test_observations_index] >= node_var_split)] # Selecting the right node
+    
     
     # Updating the depth node
     depth_node <- current_node$depth_node + 1
@@ -106,7 +115,9 @@ grow_projection_tree <- function(tree, x, node_min_size, gp_variables, theta = N
     
     # Informing the next node
     new_tree[[paste0("node_", i)]] <- list(
-      node_number = i, observations_index = left_node_split,
+      node_number = i,
+      train_observations_index = train_left_node_split,
+      test_observations_index = test_left_node_split,
       depth_node = depth_node,
       node_var = node_var_list,
       node_var_split = node_var_split,
@@ -115,14 +126,15 @@ grow_projection_tree <- function(tree, x, node_min_size, gp_variables, theta = N
       right = 0,
       parent_node = current_node$node_number, # Retrieving the number of parent node
       terminal = 1,
-      mu = current_node$mu,
-      tau = current_node$tau
+      mu = current_node$mu
     ) # Adding the node to the new_tree
     
     i <- i + 1 # Adding to the next node
     
     new_tree[[paste0("node_", i)]] <- list(
-      node_number = i, observations_index = right_node_split,
+      node_number = i,
+      train_observations_index = train_right_node_split,
+      test_observations_index = test_right_node_split,
       depth_node = depth_node,
       node_var = node_var_list,
       node_var_split = node_var_split,
@@ -131,13 +143,12 @@ grow_projection_tree <- function(tree, x, node_min_size, gp_variables, theta = N
       right = 1,
       parent_node = current_node$node_number, # Retrieving the number of parent node
       terminal = 1,
-      mu = current_node$mu,
-      tau = current_node$tau
+      mu = current_node$mu
     ) # Adding the node to the new_tree
     
     # Verifying if it is a good or bad tree
     if(any(vapply(new_tree, function(x) {
-      (length(x$observations_index) < node_min_size)
+      (length(x$train_observations_index) < node_min_size)
     }, logical(1)))) { # Verifying if any terminal node is lower than node_min_size
       count_bad_trees <- count_bad_trees + 1
     } else {
@@ -156,7 +167,7 @@ grow_projection_tree <- function(tree, x, node_min_size, gp_variables, theta = N
 # Objects to test the grow__tree_verb function
 # ==================================#
 
-grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
+grow_tree <- function(tree, x_train, x_test, node_min_size, rotation = TRUE, theta = NULL){
   
   # Controlling the "bad trees"
   bad_trees <- TRUE
@@ -171,14 +182,14 @@ grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
     # Returning the Tree if there's no node to grow
     if(sum(vapply(new_tree, function(x) {
       # This condition will see if the terminal nodes have at least more than 2* the min node size
-      x$terminal == 1 && length(x$observations_index) > 2 * node_min_size
+      x$terminal == 1 && length(x$train_observations_index) > 2 * node_min_size
     }, logical(1))) == 0) {
       return(tree)
     }
     
     # Selecting the terminal nodes
     nodes_to_grow_names <- names(new_tree[vapply(new_tree, function(x) {
-      (x$terminal == 1) && (length(x$observations_index) > 2 * node_min_size)
+      (x$terminal == 1) && (length(x$train_observations_index) > 2 * node_min_size)
     }, logical(1))])
     
     # Selecting one terminal node randomly 
@@ -188,19 +199,23 @@ grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
     current_node <- new_tree[[node_to_grow]]
     
     # Select only the covariates without the rotation
-    node_var <- sample(colnames(x), 1) 
+    node_var <- sample(colnames(x_train), 1) 
     
     # Determining that this node is no longer a terminal one
     new_tree[[node_to_grow]]$terminal <- 0
     
     # Conditioning if the covariate is continuous or categorical
-    if(is.numeric(x[, node_var])) {
+    if(is.numeric(x_train[, node_var])) {
       
       # Selecting the splitting point on the variable, unformly on the observed instances
-      node_var_split <- sample(x[current_node$observations_index, node_var], size = 1) 
+      node_var_split <- sample(x_train[current_node$train_observations_index, node_var], size = 1) 
       
-      left_node_split  <- current_node$observations_index[which(x[current_node$observations_index, node_var]  < node_var_split)] # Selecting the left node
-      right_node_split <- current_node$observations_index[which(x[current_node$observations_index, node_var] >= node_var_split)] # Selecting the right node
+      train_left_node_split  <- current_node$train_observations_index[which(x_train[current_node$train_observations_index, node_var]  < node_var_split)] # Selecting the left node
+      train_right_node_split <- current_node$train_observations_index[which(x_train[current_node$train_observations_index, node_var] >= node_var_split)] # Selecting the right node
+      
+      test_left_node_split  <- current_node$test_observations_index[which(x_test[current_node$test_observations_index, node_var]  < node_var_split)] # Selecting the left node
+      test_right_node_split <- current_node$test_observations_index[which(x_test[current_node$test_observations_index, node_var] >= node_var_split)] # Selecting the right node
+      
       
       # Updating the depth node
       depth_node <- current_node$depth_node + 1
@@ -210,7 +225,9 @@ grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
       
       # Informing the next node
       new_tree[[paste0("node_", i)]] <- list(
-        node_number = i, observations_index = left_node_split,
+        node_number = i,
+        train_observations_index = train_left_node_split,
+        test_observations_index = test_left_node_split,
         depth_node = depth_node,
         node_var = node_var,
         node_var_split = node_var_split,
@@ -218,14 +235,15 @@ grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
         right = 0,
         parent_node = current_node$node_number, # Retrieving the number of parent node
         terminal = 1,
-        mu = current_node$mu,
-        tau = current_node$tau
+        mu = current_node$mu
       ) # Adding the node to the new_tree
       
       i <- i + 1 # Adding to the next node
       
       new_tree[[paste0("node_", i)]] <- list(
-        node_number = i, observations_index = right_node_split,
+        node_number = i,
+        train_observations_index = train_right_node_split,
+        test_observations_index = test_right_node_split,
         depth_node = depth_node,
         node_var = node_var,
         node_var_split = node_var_split,
@@ -233,20 +251,22 @@ grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
         right = 1,
         parent_node = current_node$node_number, # Retrieving the number of parent node
         terminal = 1,
-        mu = current_node$mu,
-        tau = current_node$tau
+        mu = current_node$mu
       ) # Adding the node to the new_tree
       
     } else { # Condition to categorical variables
       
       # Selecting from the observations
       node_var_split <- sample(
-        levels(x[current_node$observations_index, node_var]), 
+        levels(x_train[current_node$train_observations_index, node_var]), 
         1
       ) # One sample to split
       
-      left_node_split  <- current_node$observations_index[which(x[current_node$observations_index, node_var] == node_var_split)] # Selecting the left node
-      right_node_split <- current_node$observations_index[which(x[current_node$observations_index, node_var] != node_var_split)] # Selecting the right node
+      train_left_node_split  <- current_node$train_observations_index[which(x_train[current_node$train_observations_index, node_var] == node_var_split)] # Selecting the left node
+      train_right_node_split <- current_node$train_observations_index[which(x_train[current_node$train_observations_index, node_var] != node_var_split)] # Selecting the right node
+      
+      test_left_node_split  <- current_node$test_observations_index[which(x_test[current_node$test_observations_index, node_var]  == node_var_split)] # Selecting the left node
+      test_right_node_split <- current_node$test_observations_index[which(x_test[current_node$test_observations_index, node_var] != node_var_split)] # Selecting the right node
       
       # Updating depthnode
       depth_node <- current_node$depth_node + 1
@@ -255,7 +275,9 @@ grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
       
       # Informing the next node
       new_tree[[paste0("node_", i)]] <- list(
-        node_number = i, observations_index = left_node_split,
+        node_number = i,
+        train_observations_index = train_left_node_split,
+        test_observations_index = test_left_node_split,
         depth_node = depth_node,
         node_var = node_var,
         node_var_split = node_var_split,
@@ -263,14 +285,15 @@ grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
         right = 0,
         parent_node = current_node$node_number,
         terminal = 1,
-        mu = current_node$mu,
-        tau = current_node$tau
+        mu = current_node$mu
       ) # Adding the node to the new_tree
       
       i <- i + 1 # Adding to the next node
       
       new_tree[[paste0("node_", i)]] <- list(
-        node_number = i, observations_index = right_node_split,
+        node_number = i,
+        train_observations_index = train_right_node_split,
+        test_observations_index = test_right_node_split,
         depth_node = depth_node,
         node_var = node_var,
         node_var_split = node_var_split,
@@ -278,14 +301,13 @@ grow_tree <- function(tree, x, node_min_size, rotation = TRUE, theta = NULL){
         right = 1,
         parent_node = current_node$node_number,
         terminal = 1,
-        mu = current_node$mu,
-        tau = current_node$tau
+        mu = current_node$mu
       ) # Adding the node to the new_tree
     }
     
     # Verifying if it is a good or bad tree
     if(any(vapply(new_tree, function(x) {
-      (length(x$observations_index) < node_min_size)
+      (length(x$train_observations_index) < node_min_size)
     }, logical(1)))) { # Verifying if any terminal node is lower than node_min_size
       count_bad_trees <- count_bad_trees + 1
     } else {
@@ -374,7 +396,9 @@ get_all_children <- function(new_tree, current_node) {
 }
 
 # Change a tree verb
-change_tree_verb <- function(tree, x, node_min_size, rotation = FALSE, theta = NULL) {
+change_tree_verb <- function(tree, x_train,
+                             x_test,
+                             node_min_size, rotation = FALSE, theta = NULL) {
   
   # Controlling the "bad trees"
   bad_trees <- TRUE
@@ -395,15 +419,15 @@ change_tree_verb <- function(tree, x, node_min_size, rotation = FALSE, theta = N
     current_node <- new_tree[[node_to_change]]
     
     # Selecting the covariate
-    node_var <- sample(colnames(x), 1)
+    node_var <- sample(colnames(x_train), 1)
     
     # Analyzing the case where isn't a rotated cov.
-    if(is.numeric(x[, node_var])) {
-      node_var_split <- sample(sort(x[current_node$observations_index, node_var]), size = 1) # Selecting the splitting point on the variable
+    if(is.numeric(x_train[, node_var])) {
+      node_var_split <- sample(sort(x_train[current_node$train_observations_index, node_var]), size = 1) # Selecting the splitting point on the variable
       
     } else {
       node_var_split <- sample(
-        levels(x[current_node$observations_index, node_var]), # Selecting from the observations
+        levels(x_train[current_node$train_observations_index, node_var]), # Selecting from the observations
         1
       )
     }
@@ -427,42 +451,57 @@ change_tree_verb <- function(tree, x, node_min_size, rotation = FALSE, theta = N
       if(is.list(current_node_aux$node_var)) {
         
         # Rotated Lon and Lat
-        rotated_x <- tcrossprod(A(current_node_aux$theta), x[, current_node_aux$node_var$node_var_pair,drop = FALSE])
-        rownames(rotated_x) <- current_node_aux$node_var$node_var_pair
+        rotated_x_train <- tcrossprod(A(current_node_aux$theta), x_train[, current_node_aux$node_var$node_var_pair,drop = FALSE])
+        rownames(rotated_x_train) <- current_node_aux$node_var$node_var_pair
+        
+        # Rotated Lon and Lat
+        rotated_x_test <- tcrossprod(A(current_node_aux$theta), x_test[, current_node_aux$node_var$node_var_pair,drop = FALSE])
+        rownames(rotated_x_test) <- current_node_aux$node_var$node_var_pair
+        
         
         # Updating observations from the left node
         if(current_node_aux$left == 1) {
-          new_tree[[children_from_change_node[i]]]$observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index[which(rotated_x[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index]  < current_node_aux$node_var_split)] # Updating the left node
+          new_tree[[children_from_change_node[i]]]$train_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index[which(rotated_x_train[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index]  < current_node_aux$node_var_split)] # Updating the left node
+          new_tree[[children_from_change_node[i]]]$test_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index[which(rotated_x_test[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index]  < current_node_aux$node_var_split)] # Updating the left node
+          
         } else {
-          new_tree[[children_from_change_node[i]]]$observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index[which(rotated_x[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index] >= current_node_aux$node_var_split)]
+          new_tree[[children_from_change_node[i]]]$train_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index[which(rotated_x_train[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index] >= current_node_aux$node_var_split)]
+          new_tree[[children_from_change_node[i]]]$test_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index[which(rotated_x_test[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index] >= current_node_aux$node_var_split)]
         }
         
       } else { # Checking the case where there is no rotated variable
         
         # To continous covariates
-        if(is.numeric(x[, current_node_aux$node_var])) {
+        if(is.numeric(x_train[, current_node_aux$node_var])) {
           
           # Updating observations from the left node
           if (current_node_aux$left == 1) {
-            new_tree[[children_from_change_node[i]]]$observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index[which(x[new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index, current_node_aux$node_var]  < current_node_aux$node_var_split)] # Updating the left node
+            new_tree[[children_from_change_node[i]]]$train_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index[which(x_train[new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index, current_node_aux$node_var]  < current_node_aux$node_var_split)] # Updating the left node
+            new_tree[[children_from_change_node[i]]]$test_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index[which(x_test[new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index, current_node_aux$node_var]  < current_node_aux$node_var_split)] # Updating the left node
+            
           } else {
-            new_tree[[children_from_change_node[i]]]$observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index[which(x[new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index, current_node_aux$node_var] >= current_node_aux$node_var_split)] # Updating the right node
+            new_tree[[children_from_change_node[i]]]$train_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index[which(x_train[new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index, current_node_aux$node_var] >= current_node_aux$node_var_split)] # Updating the right node
+            new_tree[[children_from_change_node[i]]]$test_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index[which(x_test[new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index, current_node_aux$node_var] >= current_node_aux$node_var_split)] # Updating the right node
+            
           }
         
           # To categorical covariates
         } else {
           # Updating observations from the left node
           if(current_node_aux$left == 1) {
-            new_tree[[children_from_change_node[i]]]$observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index[which(x[new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index, current_node_aux$node_var] == current_node_aux$node_var_split)] # Updating the left node
+            new_tree[[children_from_change_node[i]]]$train_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index[which(x_train[new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index, current_node_aux$node_var] == current_node_aux$node_var_split)] # Updating the left node
+            new_tree[[children_from_change_node[i]]]$test_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index[which(x_test[new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index, current_node_aux$node_var] == current_node_aux$node_var_split)] # Updating the left node
+            
           } else {
-            new_tree[[children_from_change_node[i]]]$observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index[which(x[new_tree[[paste0("node_", current_node_aux$parent_node)]]$observations_index, current_node_aux$node_var] != current_node_aux$node_var_split)]
+            new_tree[[children_from_change_node[i]]]$train_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index[which(x_train[new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index, current_node_aux$node_var] != current_node_aux$node_var_split)]
+            new_tree[[children_from_change_node[i]]]$test_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index[which(x_test[new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index, current_node_aux$node_var] != current_node_aux$node_var_split)]
           }
         }
       }
     }
     
     if(any(vapply(new_tree, function(x) {
-      (length(x$observations_index) < node_min_size)
+      (length(x$train_observations_index) < node_min_size)
     }, logical(1)))) { # Verifying if any terminal node is lower than node_min_size
       count_bad_trees <- count_bad_trees + 1
     } else {
@@ -775,19 +814,26 @@ swap_tree_verb <- function(tree, x, node_min_size) {
 }
 
 # Sort an action to update the tree
-update_tree_verb <- function(tree, x, node_min_size, verb,gp_variables, rotation = TRUE, theta = NULL) {
+update_tree_verb <- function(tree, x_train, x_test, node_min_size, verb,gp_variables, rotation = TRUE, theta = NULL) {
   
   # Update the tree by a verb
   updated_tree <- switch(verb,
                          grow = grow_tree(tree,
-                                          x = x, node_min_size = node_min_size, rotation = rotation,
+                                          x_train = x_train,
+                                          x_test = x_test,
+                                          node_min_size = node_min_size,
+                                          rotation = rotation,
                                           theta = theta
                          ), # Grow verb
                          grow_projection = grow_projection_tree(tree = tree,
-                                                                x = x,gp_variables = gp_variables,
+                                                                x_train = x_train,
+                                                                x_test = x_test,
+                                                                gp_variables = gp_variables,
                                                                 node_min_size = node_min_size,theta = theta),
-                         prune = prune_tree_verb(tree, x = x), # Prune verb
-                         change = change_tree_verb(tree, x = x, node_min_size = node_min_size, rotation = rotation, theta = theta), # Change verb
+                         prune = prune_tree_verb(tree), # Prune verb
+                         change = change_tree_verb(tree, x_train = x_train,
+                                                   x_test = x_test,
+                                                   node_min_size = node_min_size, rotation = rotation, theta = theta), # Change verb
                          change_projection = change_projection_tree_verb(tree = tree,gp_variables = gp_variables,
                                                                          node_min_size = node_min_size,theta = theta,x = x),
                          swap = swap_tree_verb(tree, x = x, node_min_size = node_min_size) # Swap verb
