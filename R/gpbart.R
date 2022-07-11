@@ -287,7 +287,7 @@ update_residuals <- function(tree,
 #' @return A 'gpbart_GPBART' model object,
 #' @export
 #'
-gp_bart <- function(x_train, y_train, x_test,
+gp_bart <- function(x_train, y, x_test,
                         number_trees = 2, # Setting the number of trees
                         node_min_size = 15, # Min node size,
                         mu = 0,
@@ -364,7 +364,7 @@ gp_bart <- function(x_train, y_train, x_test,
   }
 
   # Getting the maximum and minimum values from a distance matrix
-  distance_matrix_x <- symm_distance_matrix(m1 = x[,gp_variables, drop = FALSE])
+  distance_matrix_x <- symm_distance_matrix(m1 = x_train[,gp_variables, drop = FALSE])
   distance_range <- range(distance_matrix_x[upper.tri(distance_matrix_x)])
   distance_min <- sqrt(distance_range[1])
   distance_max <- sqrt(distance_range[2])
@@ -520,9 +520,6 @@ gp_bart <- function(x_train, y_train, x_test,
     label = "Running GP-Sum-Sampler..."
   )
 
-  # Getting the parameters to unormalize the data
-  a <- min(y)
-  b <- max(y)
 
   # Setting initial values for phi vector
   for(i in seq_len(n_iter)) {
@@ -540,7 +537,12 @@ gp_bart <- function(x_train, y_train, x_test,
       # Saving the store of the other ones
       curr <- (i - burn) / thin
       tree_store[[curr]] <- lapply(current_trees, remove_omega_plus_I_inv)
-      tau_store[curr] <- tau
+      
+      tau_store[curr] <- if(scale_boolean){
+        tau/((b_max-a_min)^2)
+      } else {
+        tau
+      }
       
       # Getting the posterior for y_hat_train
       y_hat_store[curr, ] <- if(scale_boolean){
@@ -627,13 +629,8 @@ gp_bart <- function(x_train, y_train, x_test,
           x_test = x_test,
           gp_variables = gp_variables,
           node_min_size = node_min_size,
-          verb = "swap", rotation = rotation, theta = theta
+          verb = verb, rotation = rotation, theta = theta
         )
-        
-        
-        new_trees$tree_1$node_3$node_var_split
-        
-        current_trees$tree_1$node_3$node_var_split
         
         new_trees[[j]] <- current_trees[[j]]
         
@@ -731,11 +728,9 @@ gp_bart <- function(x_train, y_train, x_test,
 
         # Updating the BART predictions
         predictions[j, ] <- update_predictions_bart(
-          tree = current_trees[[j]], x = x
+          tree = current_trees[[j]], x_train = x_train
         )
         
-        print(dim(current_partial_residuals_matrix))
-        print(length(current_partial_residuals))
         # Updating the current residuals
         current_partial_residuals_matrix[j, ] <- current_partial_residuals
         current_predictions_matrix[j, ] <- predictions[j, ]
@@ -1004,7 +999,7 @@ gp_bart <- function(x_train, y_train, x_test,
                   phi_proposal_store = phi_proposal_store,
                   nu_vector = nu_vector,
                   y = y_scale,
-                  X = x_original,
+                  X = x_train_original,
                   x_scale = x_scale,
                   mean_x = mean_x,
                   sd_x = sd_x,
@@ -1199,359 +1194,6 @@ get_mu_values <- function(gpbart_model) {
     return(mu_iters)
 }
 
-# ORIGINAL PREDICT GAUSSIAN FROM MULTIPLE TREES
-predict_gaussian_from_multiple_trees <- function(multiple_trees, # A list of trees
-                                                 phi_vector, # A vector of phi values
-                                                 nu_vector, # The nu value to be used
-                                                 x_train, # The x of the training model
-                                                 x_new, # The x that will be predicted
-                                                 partial_residuals, # The partial_residual values
-                                                 tau,
-                                                 pred_bart_only,# Checking if it will sample or not) {
-                                                 get_sample){ 
-  # Defining objects
-  y_pred_final <-
-
-  # Calculating the sd from the prediction interval
-  y_pred_pi_final <- matrix(0, nrow = length(multiple_trees), ncol = nrow(x_new))
-
-  # # Covariance matrix
-  # cov_pred_final <- list()
-  # if(isTRUE(get_cov_star)) { variance <- matrix(0, nrow = nrow(x_new), ncol = nrow(x_new)) }
-
-  # Iterating over all trees
-  for(m in seq_along(multiple_trees)) {
-
-    # Creating the list to be predicted (The if is just in case of of just one tree)
-    new_tree <- multiple_trees[[m]]
-    phi <- phi_vector[m]
-    nu <- nu_vector[m]
-
-    # Creating the pred  vector
-    y_pred <- numeric(nrow(x_new))
-    y_pred_pi <- numeric(nrow(x_new))
-
-    # if(isTRUE(get_cov_star)) { variance <- matrix(0, nrow = nrow(x_new), ncol = nrow(x_new)) }
-
-    # Setting the root node with the new observations
-    new_tree[["node_0"]]$test_index <- seq_len(nrow(x_new))
-
-    # Creating the list of nodes
-    list_nodes <- names(new_tree)[-1]
-
-    # IN CASE OF JUST ROOT NODE
-    if(length(new_tree) == 1) {
-      list_nodes <- "node_0"
-    }
-
-    # Updating all nodes
-    for(i in seq_along(list_nodes)) {
-
-      current_node_aux <- new_tree[[list_nodes[i]]]
-
-      # In case of more than one node
-      if(length(list_nodes) > 1) {
-        # Veryfing the type of the current node
-        if (is.list(current_node_aux$node_var)) {
-
-          # Rotated Lon and Lat
-
-          rotated_x <- tcrossprod((A(current_node_aux$theta)), x_new[,current_node_aux$node_var$node_var_pair,drop = FALSE])
-          rownames(rotated_x) <- current_node_aux$node_var$node_var_pair
-
-          # Updating observations from the left node
-          if(current_node_aux$left == 1) {
-            new_tree[[list_nodes[i]]]$test_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index[which(rotated_x[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index]  < current_node_aux$node_var_split)] # Updating the left node
-          } else {
-            new_tree[[list_nodes[i]]]$test_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index[which(rotated_x[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index] >= current_node_aux$node_var_split)]
-          }
-        } else { # Evaluating the case where is not a rotated lat/lon
-
-          # To continous covariates
-          if(is.numeric(x_new[, current_node_aux$node_var, drop = FALSE])) {
-
-            # Updating observations from the left node
-            if(current_node_aux$left == 1) {
-              new_tree[[list_nodes[i]]]$test_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index[which(x_new[new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index, current_node_aux$node_var]  < current_node_aux$node_var_split)] # Updating the left node
-            } else {
-              new_tree[[list_nodes[i]]]$test_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index[which(x_new[new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index, current_node_aux$node_var] >= current_node_aux$node_var_split)]
-            }
-
-            # To categorical covariates
-          } else {
-            # Updating observations from the left node
-            if(current_node_aux$left == 1) {
-              new_tree[[list_nodes[i]]]$test_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index[which(x_new[new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index, current_node_aux$node_var] == current_node_aux$node_var_split)] # Updating the left node
-            } else {
-              new_tree[[list_nodes[i]]]$test_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index[which(x_new[new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_index, current_node_aux$node_var] != current_node_aux$node_var_split)]
-            }
-          }
-        }
-      }
-      # Here I will calculate the predicted values based on the terminal nodes AND only on terminal nodes which have test
-
-      if(new_tree[[list_nodes[[i]]]]$terminal == 1 && length(new_tree[[list_nodes[[i]]]]$test_index) > 0) {
-
-        # Selecting the observations from the current node
-        # CHANGE HERE, TO SELECT WHICH ONE WILL BE USED
-        x_current_node <- matrix(x_train[new_tree[[list_nodes[[i]]]]$train_observations_index, ],
-                                 nrow = length(new_tree[[list_nodes[[i]]]]$train_observations_index))
-
-        # Selecting the observations from the test node
-        # CHANGE HERE, TO SELECT WHICH ONE WILL BE USED
-
-        x_star <- matrix(x_new[new_tree[[list_nodes[[i]]]]$test_index, ],
-                         nrow = length(new_tree[[list_nodes[[i]]]]$test_index))
-
-        # Calcualting the distance matrix
-        distance_matrix_current_node <- symm_distance_matrix(m1 = x_current_node)
-
-        # Generating the scenario where there are only BART predictions
-        if(isFALSE(pred_bart_only)) {
-
-          # Getting the GP from a terminal node
-          gp_process <- gp_main_sample(
-            x_train = x_current_node, distance_matrix_train = distance_matrix_current_node,
-            y_train = matrix((partial_residuals[m,new_tree[[list_nodes[[i]]]]$train_observations_index]) - new_tree[[list_nodes[[i]]]]$mu,
-                              nrow = nrow(x_current_node)),
-            x_star = x_star, tau = tau,
-            nu = nu, phi = phi,get_sample = get_sample
-          )
-
-          # Creating the mu vector
-          y_pred[new_tree[[list_nodes[i]]]$test_index] <- gp_process$mu_pred + new_tree[[list_nodes[[i]]]]$mu
-
-        } else {
-
-          # Attributing the predicted value as the sampled \mu from the terminal node
-          y_pred[new_tree[[list_nodes[i]]]$test_index] <- new_tree[[list_nodes[[i]]]]$mu
-        }
-
-        # Creating the sd of the mu vector
-        y_pred_pi[new_tree[[list_nodes[i]]]$test_index] <- (1/tau)
-
-      }
-    }
-
-    y_pred_pi_final[m,] <- y_pred_pi
-    y_pred_final[m, ] <- y_pred
-    # if(isTRUE(get_cov_star)) { cov_pred_final[[m]] <- variance }
-  }
-  # Return the new tree
-  return(list(y_pred = colSums(y_pred_final),
-              all_tree_pred = y_pred_final
-              ))
-}
-
-# Function to count the number of terminal nodes
-count_terminal_nodes <- function(tree) {
-  return(sum(vapply(tree, "[[", numeric(1), "terminal") == 1))
-}
-
-# Predicting a gpbart
-#' @method predict "gpbart_GPBART"
-#' @rdname gpbart_GPBART The fitted gpBART model
-#' @param x_test the test set
-#' @param pred_bart_only boolean if there are only bart predictions
-#' @param type select the prediction outputs among 'c("all", "mean","median"))'
-#' @param get_sample decide if the residuals will be sampled or not to get the prediction
-#' @param ... other parameters
-#' @usage
-#' \method{predict}{gpbart_GPBART}(object,
-#'         x_test,
-#'         pred_bart_only = FALSE,
-#'         type = c('all', 'median', 'mean'),
-#'         ...)
-#' @export
-predict.gpbart_GPBART <- function(object, x_test,
-                                  pred_bart_only = FALSE,
-                                  get_sample = TRUE,
-                                  type = c("all","mean","median"),...) { # type argument Can be "all", "mean" or "meadian"
-
-  # Adjusting the type
-  type <- match.arg(type)
-
-  # Loading x_train
-  if(object$x_scale){
-    x_train <- as.matrix(scale(object$X,center = object$mean_x,scale = object$sd_x))
-    x_test  <- as.matrix(scale(x_test,center = object$mean_x,scale = object$sd_x))
-
-    # Retrieving the col.names
-    colnames(x_train) <- colnames(x_test)  <- colnames(object$X)
-  } else {
-    x_train <- object$X
-  }
-
-  # Number of iters of bayesian simulation
-  n_iter <- length(object$tau_store)
-
-  # The number of columns is the number of test observations and the rows are the iterations
-  y_hat_matrix <- matrix(NA, ncol = nrow(x_test),nrow = n_iter)
-
-  # Setting the progress bar
-  progress_bar <- utils::txtProgressBar(
-    min = 1, max = n_iter,
-    style = 3, width = 50,
-    label = "Running rBART..."
-  )
-  y_list_matrix <- list()
-
-  # Creating the final vector
-  y_pred_final <- matrix(0, nrow = object$number_trees, ncol = nrow(x_test))
-
-
-  # Looping around the trees
-  for(i in seq_len(n_iter)) {
-
-    utils::setTxtProgressBar(progress_bar, i)
-
-    # Selecting one tree from BART model
-    current_tree <- object$trees[[i]]
-
-    # Getting the predictions from the test observations
-    y_pred_aux <- predict_gaussian_from_multiple_trees(
-      multiple_trees = current_tree, x_train = x_train,
-      x_new = x_test, partial_residuals = object$current_partial_residuals_list[[i]],
-      phi_vector = object$phi_store[i, ],
-      nu_vector = object$nu_vector,
-      tau = object$tau_store[[i]], pred_bart_only = pred_bart_only,
-      get_sample = get_sample
-    )
-
-    # Iterating over all trees (test)
-    y_pred_final <- y_pred_aux$all_tree_pred
-
-    if(object$scale_boolean) {
-      # Recovering the prediction interval from test
-      y_hat_matrix[i, ] <- unnormalize_bart(colSums(y_pred_final), a = object$a_min, b = object$b_max)
-    } else {
-      y_hat_matrix[i, ] <- colSums(y_pred_aux$all_tree_pred)
-    }
-
-    y_list_matrix[[i]] <- y_pred_final
-
-  }
-  # Chaging the value of \tau in case of scaling
-  object$tau_store <- if(object$scale_boolean){
-    (object$tau_store/((object$b_max-object$a_min)^2))
-  } else {
-    object$tau_store
-  }
-
-  out <- list(
-    pred = switch(type,
-                  all = y_hat_matrix,
-                  mean = colMeans(y_hat_matrix),
-                  median = apply(y_hat_matrix, 2, "median"),
-    ),
-    sd = switch(type,
-                all = object$tau_store^(-1/2),
-                mean = mean(object$tau_store^(-1/2)),
-                median = stats::median(object$tau_store^(-1/2))
-    )
-  )
-
-  return(list(out = out, list_matrix_pred = y_list_matrix))
-}
-
-# A function to count the mean values of observations in terminal nodes
-gpbart_count_terminal_nodes <- function(mod_gpbart){
-
-  # Auxiliar matrix
-  all_tree_terminal_nodes <- array(NA,dim = c(mod_gpbart$number_trees, 50, mod_gpbart$store_size),
-                                   dimnames = list(paste0("tree_", seq_len(mod_gpbart$number_trees)),
-                                                   paste0("node_", seq_len(50)),
-                                                   paste0("iter_", seq_len(mod_gpbart$store_size))))
-
-  # Iterating over MH
-  for(k in seq_len(mod_gpbart$store_size)) {
-    tree_iter <- mod_gpbart$trees[[k]]
-
-    # Iterating with for over the terminal nodes
-    for(i in seq_len(mod_gpbart$number_trees)) {
-
-      # Gathering the node number
-      node_number <- unlist(lapply(tree_iter[[i]], function(x) { x[x$terminal == 1]$node_number}))
-      all_tree_terminal_nodes[i,node_number,k] <- unlist(lapply(tree_iter[[i]][names(node_number)],function(x) {
-        length(x[x$terminal == 1]$train_observations_index)
-      }))
-
-    }
-  }
-  # Three splits
-  split_nodes <- unique(colMeans(all_tree_terminal_nodes, na.rm = TRUE))
-    return(split_nodes[!is.na(split_nodes)])
-}
-
-
-
-# Retrieve new points on the cubic scale
-unit_cube_scale_new_points_uni <- function(x, x_new) {
-
-  # Scaling to -1 to 1 function
-  scaling <-
-    (2 * x_new - (max(x) + min(x))) / (max(x) - min(x))
-
-  # Applying on all covariates
-    return(scaling)
-}
-
-# Getting the likelihood from the Gaussian Processes
-neg_loglike <- function(prediction_object,
-                        y_test) {
-
-  # Getting the prediction
-  y_pred <- colMeans(prediction_object$mcmc_pi_mean)
-
-  # Getting the variance
-  sd_pred <- colMeans(prediction_object$mcmc_pi_sd)
-
-  return(-stats::dnorm(x = y_test,
-                mean = y_pred,
-                sd = sqrt(sd_pred), log = TRUE))
-}
-
-# sum(neg_loglike(prediction_object = pred_gpbart,y_test = y_test))
-
-# Get tau from terminal nodes
-get_tau_values_from_single_tree <- function(gpbart_mod, tree_number, mh_iter = 100){
-  # Getting the vector of tau values from the terminal nodes
-  return(unlist(lapply(gpbart_mod$trees[[mh_iter]][[tree_number]],function(x) x[x$terminal == 1]$tau)))
-}
-
-# Getting Omega Inverse argument list
-# get_omega_inverse_terminal_nodes <- function(tree,
-#                                              x = x,
-#                                              nu = nu_vector[j], phi = phi_vector[j]){
-#
-#   # Selecting terminal nodes names
-#   names_terminal_nodes <- names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))
-#
-#   # Selecting the terminal nodes
-#   terminal_nodes <- tree[names_terminal_nodes]
-#
-#   # Number of nodes
-#   n_node <- length(terminal_nodes)
-#
-#   # Picking each node size
-#   nodes_size <- sapply(terminal_nodes, function(x) {
-#     length(x$observations_index)
-#   })
-#
-#   # Calculating Omega matrix INVERSE
-#   Omega_matrix_INV <- mapply(terminal_nodes, FUN = function(y) {
-#     chol2inv(  chol(kernel_function(
-#       x = matrix(x[y$observations_index, ], nrow = length(y$observations_index)),
-#       nu = nu, phi = phi
-#     )) )
-#   }, SIMPLIFY = FALSE)
-#
-#   # Adding the mu values calculated
-#   for(i in seq_along(names_terminal_nodes)) {
-#     tree[[names_terminal_nodes[i]]]$Omega_inv <- Omega_matrix_INV[[names_terminal_nodes[i]]]
-#   }
-#     return(tree)
-# }
 
 # Getting Omega Inverse + Diag Inverse
 inverse_omega_plus_I <- function(tree,
@@ -1630,51 +1272,7 @@ remove_omega_plus_I_inv <- function(current_tree_iter) {
 }
 
 
-# Getting the average values from the training predictions
-gpbart_train_mean <- function(gpbart_mod) {
-  colSums(Reduce("+", gpbart_mod$current_predictions_list)/length(gpbart_mod$current_predictions_list))
-}
 
-# Calculating the variance from the training set.
-gpbart_training_var <-  function(gpbart_mod) {
-
-  # Number of MCMC samples
-  n_mcmc <- length(gpbart_mod$trees)
-  # Creating the var vector
-  var_train <- matrix(0, nrow = n_mcmc, ncol = length(gpbart_mod$y))
-
-  # Iterating over all trees and getting the terminal nodes
-  for(i in seq_len(n_mcmc)) {
-
-    for(m in seq_len(gpbart_mod$number_trees)) {
-      # Selecting the current tree
-      tree <- gpbart_mod$trees[[i]][[m]]
-
-      # Selecting the terminal nodes
-      terminal_nodes <- tree[names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))]
-
-      # Iterating over the terminal nodes
-      for(node in terminal_nodes){
-
-        # In this line I adding up the quantity of 1/tau for each tree
-        var_train[i,node$train_observations_index] <- var_train[i,node$train_observations_index] + 1/node$tau
-      }
-    }
-  }
-
-  # Returning the var_train vector
-    return(var_train)
-}
-
-
-# Some tests over nu parameter
-calculate_nu <- function(nu) {
-  (nu + 1)/nu
-}
-
-calculate_p_nu <- function(nu, p) {
-  (p * nu + 1)/nu
-}
 
 # Get train predictions
 get_train_predictions <- function(gpbart_mod) {

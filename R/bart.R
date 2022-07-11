@@ -110,7 +110,7 @@ update_predictions_bart <- function(tree, x_train) {
   # Adding the mu values calculated
   for(i in seq_along(terminal_nodes)) {
     # Saving g
-    predictions_new[terminal_nodes[[i]]$observations_index] <- mu_values[[i]]
+    predictions_new[terminal_nodes[[i]]$train_observations_index] <- mu_values[[i]]
   }
 
     return(predictions_new)
@@ -368,11 +368,10 @@ bart <- function(x, # Covarariate matrix
     } # End of iterations over trees
 
     # Calling the function to update tau
-    tau <- update_tau(x = x,
+    tau <- update_tau_linero(x_train = x_train,
                       y = y_scale,
-                      a_tau = a_tau,
-                      d_tau = d_tau,
-                      predictions = colSums(predictions))
+                      y_hat = colSums(predictions),
+                      curr_tau = tau)
 
   } # End of the iteration over MCMC sampling
 

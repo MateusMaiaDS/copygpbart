@@ -310,7 +310,6 @@ grow_tree <- function(tree, x_train, x_test, node_min_size, rotation = TRUE, the
       (length(x$train_observations_index) < node_min_size)
     }, logical(1)))) { # Verifying if any terminal node is lower than node_min_size
       count_bad_trees <- count_bad_trees + 1
-      print("BAAD")
     } else {
       bad_trees <- FALSE # Return the new good tree
     }
