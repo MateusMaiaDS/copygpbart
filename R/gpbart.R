@@ -196,7 +196,7 @@ update_residuals <- function(tree,
   # New g (new vector prediction for g)
   residuals_train_new <- rep(NA, nrow(x_train))
   residuals_test_new <- rep(NA,nrow(x_test))
-  
+
   # Selecting terminal nodes names
   names_terminal_nodes <- names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))
 
@@ -211,35 +211,45 @@ update_residuals <- function(tree,
 
   # Getting the \mu_{j} vector
   mu_values <- vapply(terminal_nodes, "[[", numeric(1), "mu")
-  
+
   train_distance_matrix_node <- lapply(terminal_nodes, function(z) {
     symm_distance_matrix(m1 = x_train[z$train_observations_index,,drop = FALSE])
   })
-  
+
   train_residuals_sample <- mapply(terminal_nodes,
          residuals_terminal_nodes,
          mu_values,
          train_distance_matrix_node,
          FUN = function(node,resid_val,mu_val,d_m_node)
-           {mu_val + gp_main_sample(x_train = x_train[node$train_observations_index,,drop = FALSE],
+           {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
                  x_star = x_train[node$train_observations_index,,drop = FALSE],
                  y_train = (resid_val-mu_val),
                  tau = tau,phi = phi,nu = nu,
                  distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred})
-                 
-  
+
   test_residuals_sample <- mapply(terminal_nodes,
-                                  residuals_terminal_nodes,
-                                  mu_values,
-                                  train_distance_matrix_node,
-                                  FUN = function(node,resid_val,mu_val,d_m_node)
-                                  {mu_val + gp_main_sample(x_train = x_train[node$train_observations_index,,drop = FALSE],
-                                                           x_star = x_test[node$test_observations_index,,drop = FALSE],
-                                                           y_train = (resid_val-mu_val),
-                                                           tau = tau,phi = phi,nu = nu,
-                                                           distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred})
-  
-  
+                                   residuals_terminal_nodes,
+                                   mu_values,
+                                   train_distance_matrix_node,
+                                   FUN = function(node,resid_val,mu_val,d_m_node)
+                                   {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
+                                                          x_star = x_train[node$train_observations_index,,drop = FALSE],
+                                                          y_train = (resid_val-mu_val),
+                                                          tau = tau,phi = phi,nu = nu,
+                                                          distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred})
+
+  # test_residuals_sample <- mapply(terminal_nodes,
+  #                                 residuals_terminal_nodes,
+  #                                 mu_values,
+  #                                 train_distance_matrix_node,
+  #                                 FUN = function(node,resid_val,mu_val,d_m_node)
+  #                                 {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
+  #                                                          x_star = x_[node$test_observations_index,,drop = FALSE],
+  #                                                          y_train = (resid_val-mu_val),
+  #                                                          tau = tau,phi = phi,nu = nu,
+  #                                                          distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred})
+
+
   # Adding the mu values calculated
   for(i in seq_along(terminal_nodes)) {
     # Saving g
@@ -307,7 +317,7 @@ gp_bart <- function(x_train, y, x_test,
                         d_tau = 1, # Prior from d_v_ratio gamma,
                         discrete_phi_boolean = FALSE,
                         x_scale =  TRUE,
-                        gp_variables = colnames(x),   # Selecting the GP-Variables
+                        gp_variables = colnames(x_train),   # Selecting the GP-Variables
                         K_bart = 2,
                         prob_tau = 0.9,
                         kappa = 0.5, bart_boolean = TRUE, bart_number_iter = 250) {
@@ -327,28 +337,28 @@ gp_bart <- function(x_train, y, x_test,
   predictions_list =  NULL
 
   # If there's only one covariate
-  rotation <- ncol(x) != 1
+  rotation <- ncol(x_train) != 1
 
   mean_x <- NULL
   sd_x <- NULL
 
   # Scaling the x
   if(x_scale){
-    x_train_original <- x
+    x_train_original <- x_train
     x_test_original <- x_test
-    
+
     # Scaled version
-    xscale <- scale(rbind(x_train,x_test))
-    
+    xscale <- scale(x_train)
+
     mean_x <- attr(xscale,"scaled:center")
     sd_x <- attr(xscale,"scaled:scale")
-    
+
     xscale_train <- scale(x_train,center = mean_x,scale = sd_x)
     xscale_test <- scale(x_test, center = mean_x, scale = sd_x)
-    
+
     x_train <- as.matrix(x_train)
     x_test <- as.matrix(x_test)
-    
+
   } else{
     x_train_original <- x_train
     x_test_original <- x_test
@@ -447,14 +457,14 @@ gp_bart <- function(x_train, y, x_test,
 
   # Creating the current_partial_residuals
   current_partial_residuals_matrix <-
-  current_predictions_matrix <- matrix(NA, nrow = number_trees, ncol = nrow(x))
+  current_predictions_matrix <- matrix(NA, nrow = number_trees, ncol = nrow(x_train))
 
   # Creating the predictions saving
   current_partial_residuals_list <- list()
   current_predictions_list <- list()
 
   # Error of the matrix
-  if(is.null(colnames(x))) {
+  if(is.null(colnames(x_train))) {
     stop("Insert a valid NAMED matrix")
   }
 
@@ -483,9 +493,9 @@ gp_bart <- function(x_train, y, x_test,
   y_hat_store <-
   y_hat_store_proposal <- matrix(NA, ncol = length(y), nrow = store_size)
 
-  
+
   y_hat_test_store <- matrix(NA, ncol = nrow(x_test), nrow = store_size)
-  
+
   # Storing the likelihoods
   log_lik_store <-
   log_lik_store_fixed_tree <- rep(NA,store_size)
@@ -537,13 +547,13 @@ gp_bart <- function(x_train, y, x_test,
       # Saving the store of the other ones
       curr <- (i - burn) / thin
       tree_store[[curr]] <- lapply(current_trees, remove_omega_plus_I_inv)
-      
+
       tau_store[curr] <- if(scale_boolean){
         tau/((b_max-a_min)^2)
       } else {
         tau
       }
-      
+
       # Getting the posterior for y_hat_train
       y_hat_store[curr, ] <- if(scale_boolean){
 
@@ -553,16 +563,15 @@ gp_bart <- function(x_train, y, x_test,
 
         colSums(predictions)
       }
-      
-      
-      # Getting the posterior for y_hat_test 
+
+
+      # Getting the posterior for y_hat_test
       y_hat_test_store[curr,] <- if(scale_boolean){
-        
         unnormalize_bart(colSums(predictions_test), a = a_min, b = b_max)
       } else {
         colSums(predictions_test)
       }
-      
+
       # Saving the current partial
       current_partial_residuals_list[[curr]] <- current_partial_residuals_matrix
 
@@ -631,9 +640,9 @@ gp_bart <- function(x_train, y, x_test,
           node_min_size = node_min_size,
           verb = verb, rotation = rotation, theta = theta
         )
-        
+
         new_trees[[j]] <- current_trees[[j]]
-        
+
         # Checking if the update tree generated a valid tree, if not skip likelihood calculations
         if( !identical(current_trees[[j]],new_trees[[j]]) ){
 
@@ -730,7 +739,7 @@ gp_bart <- function(x_train, y, x_test,
         predictions[j, ] <- update_predictions_bart(
           tree = current_trees[[j]], x_train = x_train
         )
-        
+
         # Updating the current residuals
         current_partial_residuals_matrix[j, ] <- current_partial_residuals
         current_predictions_matrix[j, ] <- predictions[j, ]
@@ -924,17 +933,17 @@ gp_bart <- function(x_train, y, x_test,
 
         # EQUATION FROM SECTION 4
         # ==== Using the prediction from R_star_bar
-        
+
         update_residuals_aux <- update_residuals(
           tree = current_trees[[j]],
           x_train = x_train,x_test = x_test,
           residuals = current_partial_residuals,
           phi = phi_vector[j], nu = nu_vector[j], tau = tau
         )
-        
+
         predictions[j, ] <- update_residuals_aux$residuals_train
         predictions_test[j, ]<- update_residuals_aux$residuals_test
-        
+
         # To update phi
         mh_update_phi <- update_phi_marginal(current_tree_iter = current_trees[[j]],
                                                residuals = current_partial_residuals,
@@ -1201,7 +1210,7 @@ inverse_omega_plus_I <- function(tree,
                                  nu, phi,
                                  tau,
                                  number_trees = number_trees,
-                                 gp_variables = colnames(x)  # Selecting which gp-variables to use
+                                 gp_variables = colnames(x_train)  # Selecting which gp-variables to use
 
 ) {
   # Selecting terminal nodes names
