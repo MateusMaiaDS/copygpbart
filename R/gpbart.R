@@ -225,7 +225,7 @@ update_residuals <- function(tree,
                  x_star = x_train[node$train_observations_index,,drop = FALSE],
                  y_train = (resid_val-mu_val),
                  tau = tau,phi = phi,nu = nu,
-                 distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred})
+                 distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred})
 
   test_residuals_sample <- mapply(terminal_nodes,
                                    residuals_terminal_nodes,
@@ -233,29 +233,16 @@ update_residuals <- function(tree,
                                    train_distance_matrix_node,
                                    FUN = function(node,resid_val,mu_val,d_m_node)
                                    {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
-                                                          x_star = x_train[node$train_observations_index,,drop = FALSE],
+                                                          x_star = x_test[node$test_observations_index,,drop = FALSE],
                                                           y_train = (resid_val-mu_val),
                                                           tau = tau,phi = phi,nu = nu,
-                                                          distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred})
-
-  # test_residuals_sample <- mapply(terminal_nodes,
-  #                                 residuals_terminal_nodes,
-  #                                 mu_values,
-  #                                 train_distance_matrix_node,
-  #                                 FUN = function(node,resid_val,mu_val,d_m_node)
-  #                                 {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
-  #                                                          x_star = x_[node$test_observations_index,,drop = FALSE],
-  #                                                          y_train = (resid_val-mu_val),
-  #                                                          tau = tau,phi = phi,nu = nu,
-  #                                                          distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred})
-
+                                                          distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred})
 
   # Adding the mu values calculated
   for(i in seq_along(terminal_nodes)) {
     # Saving g
     residuals_train_new[terminal_nodes[[i]]$train_observations_index] <- train_residuals_sample[[i]]
     residuals_test_new[terminal_nodes[[i]]$test_observations_index] <- test_residuals_sample[[i]]
-
 
   }
     return(list(residuals_train = residuals_train_new,
