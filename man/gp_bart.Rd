@@ -5,8 +5,9 @@
 \title{Fit a GP-BART model}
 \usage{
 gp_bart(
-  x,
+  x_train,
   y,
+  x_test,
   number_trees = 2,
   node_min_size = 15,
   mu = 0,
@@ -25,7 +26,7 @@ gp_bart(
   d_tau = 1,
   discrete_phi_boolean = FALSE,
   x_scale = TRUE,
-  gp_variables = colnames(x),
+  gp_variables = colnames(x_train),
   K_bart = 2,
   prob_tau = 0.9,
   kappa = 0.5,
@@ -34,9 +35,11 @@ gp_bart(
 )
 }
 \arguments{
-\item{x}{A named matrix x of the covariates from the training data.}
+\item{x_train}{A named train matrix x of the covariates from the training data.}
 
-\item{y}{A named matriy y of the response from the training data}
+\item{y}{A named matrix y of the response from the training data}
+
+\item{x_test}{A named test matrix}
 
 \item{number_trees}{Number of trees used in the GP-BART model.}
 

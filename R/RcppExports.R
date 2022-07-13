@@ -2,10 +2,10 @@
 # Generator token: 10BE3573-1514-4C36-9D1C-5A225CD40393
 
 symm_distance_matrix <- function(m1) {
-    .Call('_gpbart_symm_distance_matrix', PACKAGE = 'gpbart', m1)
+    .Call('_copygpbart_symm_distance_matrix', PACKAGE = 'copygpbart', m1)
 }
 
 distance_matrix <- function(m1, m2) {
-    .Call('_gpbart_distance_matrix', PACKAGE = 'gpbart', m1, m2)
+    .Call('_copygpbart_distance_matrix', PACKAGE = 'copygpbart', m1, m2)
 }
 

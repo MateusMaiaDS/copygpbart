@@ -66,7 +66,7 @@ update_tau_linero <- function(x_train,
 
   sigma_naive <- naive_sigma(x = x_train,y = y)
 
-  proposal_tau <- rgamma(n = 1,shape = 0.5*n+1,rate = 0.5*crossprod( (y-y_hat) ))
+  proposal_tau <- stats::rgamma(n = 1,shape = 0.5*n+1,rate = 0.5*crossprod( (y-y_hat) ))
 
   proposal_sigma <- proposal_tau^(-1/2)
 
@@ -75,7 +75,7 @@ update_tau_linero <- function(x_train,
                 log(dh_cauchy(x = curr_sigma,location = 0,sigma = sigma_naive)) -
                 3*log(curr_sigma))
 
-  if(runif(n = 1)<acceptance){
+  if(stats::runif(n = 1)<acceptance){
     return(proposal_sigma^(-2))
   } else {
     return(curr_tau)

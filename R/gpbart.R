@@ -1,5 +1,5 @@
 ## GP-Bart
-#' @useDynLib gpbart
+#' @useDynLib copygpbart
 #' @importFrom Rcpp sourceCpp
 # ==================================#
 # Objects to test the tree_complete_conditional function
@@ -254,8 +254,9 @@ update_residuals <- function(tree,
 # rBart-GP FUNCTION
 #' Fit a GP-BART model
 #'
-#' @param x A named matrix x of the covariates from the training data.
-#' @param y A named matriy y of the response from the training data
+#' @param x_train A named train matrix x of the covariates from the training data.
+#' @param y A named matrix y of the response from the training data
+#' @param x_test A named test matrix
 #' @param number_trees Number of trees used in the GP-BART model.
 #' @param node_min_size Minimum number of observations in a terminal node
 #' @param mu Initial values for the \eqn{\mu} parameter
@@ -681,7 +682,7 @@ gp_bart <- function(x_train, y, x_test,
           likelihood_new <- likelihood_old <- tree_complete_conditional_bart(
             tree = new_trees[[j]], # Calculate the full conditional
             residuals_values = current_partial_residuals,
-            x = x, tau_mu = tau_mu, tau = tau
+            x_train = x_train, tau_mu = tau_mu, tau = tau
           )
           acceptance <- 0
         }
@@ -717,7 +718,7 @@ gp_bart <- function(x_train, y, x_test,
         # To update the mu values
         current_trees[[j]] <- update_mu_bart(
           tree = current_trees[[j]],
-          x = x,
+          x_train = x_train,
           residuals = current_partial_residuals,
           tau = tau,
           tau_mu = tau_mu)

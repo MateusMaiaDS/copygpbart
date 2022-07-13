@@ -1,4 +1,4 @@
-Package: gpbart
+Package: copygpbart
 Title: GP-BART: Gaussian Processes Bayesian Additive Regression Trees 
 Version: 0.0.0.9000
 Authors@R: 

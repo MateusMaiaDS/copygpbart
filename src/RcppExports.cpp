@@ -12,7 +12,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 
 // symm_distance_matrix
 NumericMatrix symm_distance_matrix(NumericMatrix m1);
-RcppExport SEXP _gpbart_symm_distance_matrix(SEXP m1SEXP) {
+RcppExport SEXP _copygpbart_symm_distance_matrix(SEXP m1SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -23,7 +23,7 @@ END_RCPP
 }
 // distance_matrix
 NumericMatrix distance_matrix(NumericMatrix m1, NumericMatrix m2);
-RcppExport SEXP _gpbart_distance_matrix(SEXP m1SEXP, SEXP m2SEXP) {
+RcppExport SEXP _copygpbart_distance_matrix(SEXP m1SEXP, SEXP m2SEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -35,12 +35,12 @@ END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_gpbart_symm_distance_matrix", (DL_FUNC) &_gpbart_symm_distance_matrix, 1},
-    {"_gpbart_distance_matrix", (DL_FUNC) &_gpbart_distance_matrix, 2},
+    {"_copygpbart_symm_distance_matrix", (DL_FUNC) &_copygpbart_symm_distance_matrix, 1},
+    {"_copygpbart_distance_matrix", (DL_FUNC) &_copygpbart_distance_matrix, 2},
     {NULL, NULL, 0}
 };
 
-RcppExport void R_init_gpbart(DllInfo *dll) {
+RcppExport void R_init_copygpbart(DllInfo *dll) {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
     R_useDynamicSymbols(dll, FALSE);
 }

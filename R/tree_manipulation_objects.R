@@ -872,24 +872,24 @@ update_tree_verb <- function(tree, x_train, x_test, node_min_size, verb,gp_varia
 }
 
 # Sort an action to update the tree
-update_tree_verb_bart <- function(tree, x, node_min_size, verb, rotation = TRUE, theta = NULL) {
-  
-  # Update the tree by a verb
-  updated_tree <- switch(verb,
-                         grow = grow_tree(tree,
-                                          x_train = x_train,
-                                          x_test = x_test,
-                                          node_min_size = node_min_size, rotation = rotation,
-                                          theta = theta
-                         ), 
-                         prune = prune_tree_verb(tree), # Prune verb
-                         change = change_tree_verb(tree, x_train = x_train,
-                                                   x_test = x_test, node_min_size = node_min_size, rotation = rotation, theta = theta), # Change verb
-                         swap = swap_tree_verb(tree, x_train = x_train,
-                                               x_test = x_test, node_min_size = node_min_size) # Swap verb
-  )
-    return(updated_tree)
-}
+# update_tree_verb_bart <- function(tree, x_train, x_test, node_min_size, verb, rotation = TRUE, theta = NULL) {
+#   
+#   # Update the tree by a verb
+#   updated_tree <- switch(verb,
+#                          grow = grow_tree(tree,
+#                                           x_train = x_train,
+#                                           x_test = x_test,
+#                                           node_min_size = node_min_size, rotation = rotation,
+#                                           theta = theta
+#                          ), 
+#                          prune = prune_tree_verb(tree), # Prune verb
+#                          change = change_tree_verb(tree, x_train = x_train,
+#                                                    x_test = x_test, node_min_size = node_min_size, rotation = rotation, theta = theta), # Change verb
+#                          swap = swap_tree_verb(tree, x_train = x_train,
+#                                                x_test = x_test, node_min_size = node_min_size) # Swap verb
+#   )
+#     return(updated_tree)
+# }
 
 # Calculate transition factor
 log_transition_prob <- function(current_tree, new_tree, verb){
