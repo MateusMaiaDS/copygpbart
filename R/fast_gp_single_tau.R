@@ -113,7 +113,7 @@ gp_main_slow <- function(x_train, y_train, x_star, tau,
                             nu = nu, phi = phi)
   
   mu_star <- crossprod(K_star,solve(K_y,y_train))
-  
+  mu_star <- matrix(mu_star,nrow = n_train)
   # print(mu_star[1:5])
   
   # Here the abs is because the smallest values that are coming from here are due to numerical approximations.
@@ -124,11 +124,8 @@ gp_main_slow <- function(x_train, y_train, x_star, tau,
     
     cov_star <- K_star_star - crossprod(K_star,solve(K_y,K_star))
 
-    # residuals_sample <- rMVN_var(mean = mu_star,Sigma = cov_star)
+    residuals_sample <- rMVN_var(mean = mu_star,Sigma = cov_star)
     
-    residuals_sample <- mvtnorm::rmvnorm(n = 1,mean = mu_star,sigma = cov_star)
-    
-    # results <- list(mu_pred = residuals_sample, cov_pred = cov_star)
     results <- list(mu_pred = unlist(residuals_sample))
     
   } else {

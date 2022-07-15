@@ -225,18 +225,18 @@ update_residuals <- function(tree,
                  x_star = x_train[node$train_observations_index,,drop = FALSE],
                  y_train = (resid_val-mu_val),
                  tau = tau,phi = phi,nu = nu,
-                 distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred})
-
+                 distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred},SIMPLIFY = FALSE)
+  
   test_residuals_sample <- mapply(terminal_nodes,
-                                   residuals_terminal_nodes,
+                                  train_residuals_sample,
                                    mu_values,
                                    train_distance_matrix_node,
-                                   FUN = function(node,resid_val,mu_val,d_m_node)
+                                   FUN = function(node,res_sample,mu_val,d_m_node)
                                    {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
                                                           x_star = x_test[node$test_observations_index,,drop = FALSE],
-                                                          y_train = (resid_val-mu_val),
-                                                          tau = tau,phi = phi,nu = nu,
-                                                          distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred})
+                                                          y_train = (res_sample-mu_val),
+                                                          tau = 1e10,phi = phi,nu = nu,
+                                                          distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
 
   # Adding the mu values calculated
   for(i in seq_along(terminal_nodes)) {
@@ -368,7 +368,7 @@ gp_bart <- function(x_train, y, x_test,
   distance_max <- sqrt(distance_range[2])
 
   # Setting seed
-  set.seed(seed)
+  # set.seed(seed)
   acc_ratio <- 0
   acc_ratio_phi <- 0
   acc_ratio_nu <- 0
