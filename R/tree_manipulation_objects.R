@@ -327,7 +327,7 @@ grow_tree <- function(tree, x_train, x_test, node_min_size, rotation = TRUE, the
 # ==================================#
 
 # Prune a tree verb
-prune_tree_verb <- function(tree, x) {
+prune_tree_verb <- function(tree) {
   
   # Returning if the tree is just a single node
   if(length(tree) == 1) {
@@ -605,7 +605,7 @@ change_projection_tree_verb <- function(tree, x_train,
           
         } else {
           new_tree[[children_from_change_node[i]]]$train_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index[which(rotated_x_train[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$train_observations_index] >= current_node_aux$node_var_split)]
-          new_tree[[children_from_change_node[i]]]$test_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index[which(rotated_x_test[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index]  < current_node_aux$node_var_split)] # Updating the left node
+          new_tree[[children_from_change_node[i]]]$test_observations_index <- new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index[which(rotated_x_test[current_node_aux$node_var$node_var, new_tree[[paste0("node_", current_node_aux$parent_node)]]$test_observations_index] >= current_node_aux$node_var_split)]
         }
         
       } else { # Checking the case where there is no rotated variable

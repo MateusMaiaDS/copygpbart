@@ -228,14 +228,14 @@ update_residuals <- function(tree,
                  distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred},SIMPLIFY = FALSE)
   
   test_residuals_sample <- mapply(terminal_nodes,
-                                  train_residuals_sample,
+                                   train_residuals_sample,
                                    mu_values,
                                    train_distance_matrix_node,
                                    FUN = function(node,res_sample,mu_val,d_m_node)
                                    {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
                                                           x_star = x_test[node$test_observations_index,,drop = FALSE],
                                                           y_train = (res_sample-mu_val),
-                                                          tau = 1e10,phi = phi,nu = nu,
+                                                          tau = 1e20,phi = phi,nu = nu,
                                                           distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
 
   # Adding the mu values calculated
@@ -398,10 +398,10 @@ gp_bart <- function(x_train, y, x_test,
     tau_mu_gpbart <- tau_mu_bart/kappa
 
     # Getting the optimal tau values
-    d_tau <- rate_tau(x = x_train,
-                      y = y_scale,
-                      prob = prob_tau,
-                      shape = a_tau)
+    # d_tau <- rate_tau(x = x_train,
+    #                   y = y_scale,
+    #                   prob = prob_tau,
+    #                   shape = a_tau)
 
   } else {
 
@@ -420,10 +420,10 @@ gp_bart <- function(x_train, y, x_test,
     tau_mu_gpbart <- tau_mu_bart/kappa
 
     # Getting the optimal tau values
-    d_tau <- rate_tau(x = x_train,
-                      y = y_scale,
-                      prob = prob_tau,
-                      shape = a_tau)
+    # d_tau <- rate_tau(x = x_train,
+    #                   y = y_scale,
+    #                   prob = prob_tau,
+    #                   shape = a_tau)
   }
 
 
@@ -554,12 +554,13 @@ gp_bart <- function(x_train, y, x_test,
 
 
       # Getting the posterior for y_hat_test
-      y_hat_test_store[curr,] <- if(scale_boolean){
+      y_hat_test_store[curr, ] <- if(scale_boolean){
         unnormalize_bart(colSums(predictions_test), a = a_min, b = b_max)
       } else {
         colSums(predictions_test)
       }
-
+      
+     
       # Saving the current partial
       current_partial_residuals_list[[curr]] <- current_partial_residuals_matrix
 
@@ -789,6 +790,10 @@ gp_bart <- function(x_train, y, x_test,
         )
 
 
+        # new_trees[[j]]$node_1$test_observations_index
+        # new_trees[[j]]$node_2$test_observations_index
+        
+        # current_trees[[j]] <- new_trees[[j]]
         # ==================== #
         # Getting the Omega Inverse the current and the future tree
         # ==================== #
@@ -1248,7 +1253,7 @@ inverse_omega_plus_I <- function(tree,
     tree[[names_terminal_nodes[i]]]$Omega_matrix <- Omega_matrix[[names_terminal_nodes[i]]]
     tree[[names_terminal_nodes[i]]]$is_Omega_diag <- is_Omega_diag[[names_terminal_nodes[i]]]
   }
-    return(tree)
+  return(tree)
 }
 
 # # Removing the Omega_plus_I_inv object
