@@ -555,7 +555,7 @@ gp_bart <- function(x_train, y, x_test,
 
       # Getting the posterior for y_hat_test
       y_hat_test_store[curr, ] <- if(scale_boolean){
-        colSums(unnormalize_bart(predictions_test, a = a_min, b = b_max))
+        unnormalize_bart(colSums(predictions_test), a = a_min, b = b_max)
       } else {
         colSums(predictions_test)
       }
