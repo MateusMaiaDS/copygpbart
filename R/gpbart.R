@@ -231,14 +231,14 @@ update_residuals <- function(tree,
                                    train_residuals_sample,
                                    mu_values,
                                    train_distance_matrix_node,
-                                   FUN = function(node,res_sample,mu_val,d_m_node)
+                                   FUN = function(node,res_val,mu_val,d_m_node)
                                    {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
                                                           x_star = x_test[node$test_observations_index,,drop = FALSE],
-                                                          y_train = (res_sample-mu_val),
-                                                          tau = 1e20,phi = phi,nu = nu,
+                                                          y_train = (res_val-mu_val),
+                                                          tau = 1e12,phi = phi,nu = nu,
                                                           distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
 
-  # Adding the mu values calculated
+  
   for(i in seq_along(terminal_nodes)) {
     # Saving g
     residuals_train_new[terminal_nodes[[i]]$train_observations_index] <- train_residuals_sample[[i]]
@@ -555,7 +555,7 @@ gp_bart <- function(x_train, y, x_test,
 
       # Getting the posterior for y_hat_test
       y_hat_test_store[curr, ] <- if(scale_boolean){
-        unnormalize_bart(colSums(predictions_test), a = a_min, b = b_max)
+        colSums(unnormalize_bart(predictions_test, a = a_min, b = b_max))
       } else {
         colSums(predictions_test)
       }

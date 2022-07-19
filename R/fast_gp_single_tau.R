@@ -113,13 +113,21 @@ gp_main_slow <- function(x_train, y_train, x_star, tau,
   } else {
     K_y <- PD_chol(kernel_function(squared_distance_matrix = distance_matrix_train,
                            nu = nu,
-                           phi = phi))
+                           phi = phi)) + diag(x = 1/(tau), nrow = n_train) 
   }
   K_diag <- is_diag_matrix(K_y)
   K_star <- kernel_function(squared_distance_matrix = distance_matrix_K_star,
                             nu = nu, phi = phi)
   
-  mu_star <- crossprod(K_star,solve(K_y,y_train))
+  # Calculating \alpha
+  if(K_diag) {
+    L <- diag(K_y)
+    alpha <- y_train/L
+  } else {
+    L <- chol(K_y)
+    alpha <- backsolve(L, backsolve(L, y_train, transpose = TRUE, k = n_train), k = n_train)
+  }
+  mu_star <- crossprod(K_star, alpha)
   
   # this line is fucking up everything
   # mu_star <- matrix(mu_star,nrow = n_train)
@@ -151,7 +159,7 @@ gp_main_slow <- function(x_train, y_train, x_star, tau,
 kernel_function <- function(squared_distance_matrix, nu, phi) {
   
   # Calculating the square matrix
-  kernel_matrix <- exp(-squared_distance_matrix / (2 * phi^2)) / nu
+  kernel_matrix <- (exp(-squared_distance_matrix / (2 * phi^2))) / nu
   
   # Case nu = 0
   if(nu == 0 || nu > 1e13){

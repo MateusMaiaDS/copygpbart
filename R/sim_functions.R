@@ -207,3 +207,33 @@ sim_2d_two_node <- function(n, seed, sd_value){
 # rmse(obs = y_test,pred = colMeans(soft_bart$y_hat_test))
 # 
 # plot3d(cbind(x_test,y_test))
+
+
+#=========== Reading all arguments to debugg ===============#
+# number_trees = 2 # Setting the number of trees
+# node_min_size = 15 # Min node size
+# mu = 0
+# alpha = 0.5 # Alpha from prior
+# beta = 5 # Beta from prior
+# tau = 1 # Tau from prior
+# n_iter = 2000 # Number of iterations
+# burn = 500 # Number of burn
+# thin = 1 # Number of thin
+# rotation = TRUE # If rotated lon and lat will be used in tree building
+# theta = NULL # If theta is NULL then the rotation angle will be randomly selected
+# seed = NULL # Alpha vector values from the Dirichlet prior
+# scale_boolean = TRUE
+# # This will be defining the nu the default value
+# nu_vector = NULL
+# a_tau = 3 # Prior from a_v_ratio gamma
+# d_tau = 1 # Prior from d_v_ratio gamma
+# discrete_phi_boolean = FALSE
+# x_scale =  TRUE
+# gp_variables = colnames(x_train)   # Selecting the GP-Variables
+# K_bart = 2
+# prob_tau = 0.9
+# kappa = 0.5
+# bart_boolean = TRUE 
+# bart_number_iter = 250
+
+
