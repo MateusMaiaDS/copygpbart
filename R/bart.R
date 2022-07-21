@@ -8,41 +8,41 @@ tree_complete_conditional_bart <- function(x_train,
                                            tree,
                                            tau_mu,
                                            tau) {
-
+  
   # Getting the number of observations of the data
   n <- nrow(x_train)
-
+  
   # Selecting the terminal nodes
   terminal_nodes <- tree[names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))]
-
+  
   # Number of nodes
   n_node <- length(terminal_nodes)
-
+  
   # Picking each node size
   nodes_size <- vapply(terminal_nodes, function(x) {
     length(x$train_observations_index)
   }, numeric(1))
-
+  
   # Retrieving Residuals terminal nodes
   residuals_terminal_nodes <- lapply(terminal_nodes, function(x) {
     residuals_values[x$train_observations_index]
   })
-
+  
   # Defining RT_Omega_I_R
   RTR <- unlist(mapply(terminal_nodes, residuals_terminal_nodes, FUN = function(nodes, resid) {
     crossprod(resid)
   }, SIMPLIFY = FALSE))
-
+  
   # The term R^{T} solve(Omega + I ) 1
   R_Omega_I_one <- unlist(mapply(terminal_nodes, residuals_terminal_nodes, FUN = function(nodes, residuals) {
     sum(residuals)
   }, SIMPLIFY = FALSE))
-
+  
   # Retrieve all nodes values and calculate all of them
   temp <- nodes_size * tau + tau_mu
   log_posterior <- 0.5 * n * log(tau) + 0.5 * sum(log(tau_mu) - log(temp)) -
     0.5 * tau * sum(RTR) + 0.5 * (tau^2) * sum((R_Omega_I_one^2)/(temp))
-    return(log_posterior)
+  return(log_posterior)
 }
 
 
@@ -53,29 +53,29 @@ update_mu_bart <- function(tree,
                            tau_mu,
                            residuals,
                            seed = NULL) {
-
+  
   # Selecting terminal nodes names
   names_terminal_nodes <- names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))
-
+  
   # Selecting the terminal nodes
   terminal_nodes <- tree[names_terminal_nodes]
-
+  
   # Picking each node size
   nodes_size <- vapply(terminal_nodes, function(x) {
     length(x$train_observations_index)
   }, numeric(1))
-
+  
   # Residuals terminal nodes
   residuals_terminal_nodes_sum <- vapply(terminal_nodes, function(node) {
     sum(residuals[node$train_observations_index])
   }, numeric(1))
-
+  
   # Remember that S = n_node*tau
   S <- nodes_size * tau + tau_mu
-
+  
   # Mu mean value
   mu_mean <- tau/S * residuals_terminal_nodes_sum
-
+  
   # Calculating mu values
   mu <- mapply(mu_mean, sqrt(S),
                FUN = function(x, y) {
@@ -85,35 +85,39 @@ update_mu_bart <- function(tree,
                    sd = 1/y
                  )
                }, SIMPLIFY = FALSE)
-
+  
   # Adding the mu values calculated
   for(i in seq_along(names_terminal_nodes)) {
     tree[[names_terminal_nodes[i]]]$mu <- mu[[names_terminal_nodes[i]]]
   }
-    return(tree)
+  return(tree)
 }
 
 update_predictions_bart <- function(tree, x_train) {
-
+  
   # New g (new vector prediction for g)
   predictions_new <- rep(NA, nrow(x_train))
-
+  predictions_new_test <- rep(NA, nrow(x_train))
+  
   # Selecting terminal nodes names
   names_terminal_nodes <- names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))
-
+  
   # Selecting the terminal nodes
   terminal_nodes <- tree[names_terminal_nodes]
-
+  
   # Getting the \mu_{j} vector
   mu_values <- vapply(terminal_nodes, "[[", numeric(1), "mu")
-
+  
   # Adding the mu values calculated
   for(i in seq_along(terminal_nodes)) {
     # Saving g
     predictions_new[terminal_nodes[[i]]$train_observations_index] <- mu_values[[i]]
+    predictions_new_test[terminal_nodes[[i]]$test_observations_index] <- mu_values[[i]]
+    
   }
-
-    return(predictions_new)
+  
+  return(list(pred_train = predictions_new,
+              pred_test = predictions_new_test))
 }
 
 # Calculating the BART object model
