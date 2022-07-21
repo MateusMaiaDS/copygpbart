@@ -725,7 +725,7 @@ gp_bart <- function(x_train, y, x_test,
         
         # Updating the BART predictions
         bart_pred_aux <- update_predictions_bart(
-          tree = current_trees[[j]], x_train = x_train
+          tree = current_trees[[j]], x_train = x_train,x_test = x_test
         )
         
         predictions[j, ] <- bart_pred_aux$pred_train

@@ -93,11 +93,11 @@ update_mu_bart <- function(tree,
   return(tree)
 }
 
-update_predictions_bart <- function(tree, x_train) {
+update_predictions_bart <- function(tree, x_train,x_test) {
   
   # New g (new vector prediction for g)
   predictions_new <- rep(NA, nrow(x_train))
-  predictions_new_test <- rep(NA, nrow(x_train))
+  predictions_new_test <- rep(NA, nrow(x_test))
   
   # Selecting terminal nodes names
   names_terminal_nodes <- names(which(vapply(tree, "[[", numeric(1), "terminal") == 1))
