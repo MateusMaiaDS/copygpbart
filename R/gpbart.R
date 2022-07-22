@@ -235,7 +235,7 @@ update_residuals <- function(tree,
                                   {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
                                                          x_star = x_test[node$test_observations_index,,drop = FALSE],
                                                          y_train = (resid_val-mu_val),
-                                                         tau = 1e20,phi = phi,nu = 1,
+                                                         tau = 1e12,phi = phi,nu = 1,
                                                          distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
   
   # Adding the mu values calculated
