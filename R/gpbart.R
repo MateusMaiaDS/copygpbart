@@ -228,7 +228,7 @@ update_residuals <- function(tree,
                                                           distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
   
   test_residuals_sample <- mapply(terminal_nodes,
-                                  residuals_terminal_nodes,
+                                  train_residuals_sample,
                                   mu_values,
                                   train_distance_matrix_node,
                                   FUN = function(node,resid_val,mu_val,d_m_node)

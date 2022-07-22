@@ -23,7 +23,7 @@ gp_main <- function(x_train, y_train, x_star, tau, phi, nu, distance_matrix_trai
   #   L <- diag(K_y)
   #   alpha <- y_train/L
   # } else {
-    L <- chol(K_y)
+    L <- PD_chol(K_y)
     alpha <- backsolve(L, backsolve(L, y_train, transpose = TRUE, k = n_train), k = n_train)
   # }
   mu_star <- crossprod(K_star, alpha)
@@ -68,7 +68,7 @@ gp_main_sample <- function(x_train, y_train, x_star, tau,
     L <- diag(K_y)
     alpha <- y_train/L
   } else {
-    L <- chol(K_y)
+    L <- PD_chol(K_y)
     alpha <- backsolve(L, backsolve(L, y_train, transpose = TRUE, k = n_train), k = n_train)
   }
   mu_star <- crossprod(K_star, alpha)
@@ -124,7 +124,7 @@ gp_main_slow <- function(x_train, y_train, x_star, tau,
     L <- diag(K_y)
     alpha <- y_train/L
   } else {
-    L <- chol(K_y)
+    L <- PD_chol(K_y)
     alpha <- backsolve(L, backsolve(L, y_train, transpose = TRUE, k = n_train), k = n_train)
   }
   mu_star <- crossprod(K_star, alpha)
