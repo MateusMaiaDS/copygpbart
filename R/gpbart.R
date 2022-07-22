@@ -225,7 +225,7 @@ update_residuals <- function(tree,
                                                           x_star = x_train[node$train_observations_index,,drop = FALSE],
                                                           y_train = (resid_val-mu_val),
                                                           tau = tau,phi = phi,nu = nu,
-                                                          distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred})
+                                                          distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
   
   test_residuals_sample <- mapply(terminal_nodes,
                                   residuals_terminal_nodes,
@@ -236,7 +236,7 @@ update_residuals <- function(tree,
                                                          x_star = x_test[node$test_observations_index,,drop = FALSE],
                                                          y_train = (resid_val-mu_val),
                                                          tau = tau,phi = phi,nu = nu,
-                                                         distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred})
+                                                         distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
   
   # Adding the mu values calculated
   for(i in seq_along(terminal_nodes)) {
@@ -308,7 +308,9 @@ gp_bart <- function(x_train, y, x_test,
                     gp_variables = colnames(x_train),   # Selecting the GP-Variables
                     K_bart = 2,
                     prob_tau = 0.9,
-                    kappa = 0.5, bart_boolean = TRUE, bart_number_iter = 250) {
+                    kappa = 0.5,
+                    bart_boolean = TRUE,
+                    bart_number_iter = 250) {
   
   # Changing the node_min_size
   if(node_min_size>=nrow(x_train)){
