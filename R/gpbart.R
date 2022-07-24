@@ -228,15 +228,15 @@ update_residuals <- function(tree,
                                                           distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
   
   test_residuals_sample <- mapply(terminal_nodes,
-                                  train_residuals_sample,
+                                  residuals_terminal_nodes,
                                   mu_values,
                                   train_distance_matrix_node,
                                   FUN = function(node,resid_val,mu_val,d_m_node)
                                   {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
                                                          x_star = x_test[node$test_observations_index,,drop = FALSE],
                                                          y_train = (resid_val-mu_val),
-                                                         tau = 1e12,phi = phi,nu = 1,
-                                                         distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
+                                                         tau = tau,phi = phi,nu = nu,
+                                                         distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred},SIMPLIFY = FALSE)
   
   # Adding the mu values calculated
   for(i in seq_along(terminal_nodes)) {
