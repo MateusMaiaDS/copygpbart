@@ -236,3 +236,49 @@ crps <- function(y,means,sds){
 
   return(list(CRPS = mean(crps_vector), crps = crps_vector))
 }
+
+# Calculate optim \phi value
+log_like_partial_length_parameter <- function(phi,
+                                              squared_distance_matrix,
+                                              nu,
+                                              tau,
+                                              y){
+  
+  # Find the omega first
+  omega <- kernel_function(squared_distance_matrix = squared_distance_matrix,nu = nu,phi = phi) 
+  K_y <- omega + diag(1/tau, nrow = nrow(squared_distance_matrix))
+  
+  # Calculating alpha  = solve(K_y,y)
+  alpha <- solve(K_y,y)
+  
+  # Calculating the partial matrix
+  K_partial_l <- -(phi^-3)*omega*squared_distance_matrix
+  
+  
+  # THE MINUS HERE IS JUST BECAUSE THE optim FUNCTION ONLY MINIMIZES
+  return(- 0.5*sum(diag( crossprod(tcrossprod(alpha)-chol2inv(chol(K_y)),K_partial_l ))) )
+}
+
+
+# sq_dist_matrix <- symm_distance_matrix(m1 = x)
+# nu <- 16*10
+# y_vec <- normalize_bart(y)
+# tau <- 100
+# min_dist <- sqrt(min(sq_dist_matrix))
+# max_dist <- sqrt(max(sq_dist_matrix))
+# 
+# phi_max <- numeric()
+# optim_length <- optim(par = runif(n = 1,
+#                                   min = min_dist,
+#                                   max = max_dist),
+#                       method = "L-BFGS-B",
+#                       lower = min_dist+.Machine$double.eps,
+#                       upper = max_dist,
+#                       fn = log_like_partial_length_parameter,
+#                       squared_distance_matrix = sq_dist_matrix,
+#                       nu = nu,
+#                       tau = tau,
+#                       y = y_vec )
+# 
+# optim_length$par                      
+

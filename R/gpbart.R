@@ -309,6 +309,7 @@ gp_bart <- function(x_train, y, x_test,
                     K_bart = 2,
                     prob_tau = 0.9,
                     kappa = 0.5,
+                    phi_vector = rep(1, number_trees),
                     bart_boolean = TRUE,
                     bart_number_iter = 250) {
   
@@ -318,7 +319,6 @@ gp_bart <- function(x_train, y, x_test,
   }
   
   # This parameter is a "scale paramter" to the GP
-  phi_vector = rep(0.1 / (sqrt(number_trees)), number_trees)
   
   
   # Creating the prediction elements to be stored
@@ -512,6 +512,7 @@ gp_bart <- function(x_train, y, x_test,
   
   names(current_trees) <-
     names(current_trees_proposal) <- vapply(seq_len(number_trees), function(x) paste0("tree_", x), character(1)) # Naming each tree
+  
   
   # Setting the progress bar
   progress_bar <- utils::txtProgressBar(
@@ -851,6 +852,21 @@ gp_bart <- function(x_train, y, x_test,
           log_transition <- log_transition_prob(current_tree = current_trees[[j]],
                                                 new_tree = new_trees[[j]],verb = verb)
           
+          
+          # Doing a small experiemnt
+          # mvnfast::dmvn(X = current_partial_residuals,
+          #               mu = matrix(0,ncol = length(current_partial_residuals)),
+          #               sigma = current_trees$tree_1$node_0$Omega_matrix+tau_mu+diag(1/tau,nrow = length(x_train)),log = TRUE)
+          # 
+          # mvnfast::dmvn(X = current_partial_residuals[new_trees$tree_1$node_1$train_observations_index],
+          #               mu = matrix(0,ncol = length(new_trees$tree_1$node_1$train_observations_index)),
+          #               sigma = new_trees$tree_1$node_1$Omega_matrix+tau_mu+diag(1/tau,nrow = length(new_trees$tree_1$node_1$train_observations_index)),log = TRUE)
+          # 
+          # mvnfast::dmvn(X = current_partial_residuals[new_trees$tree_1$node_2$train_observations_index],
+          #               mu = matrix(0,ncol = length(new_trees$tree_1$node_2$train_observations_index)),
+          #               sigma = new_trees$tree_1$node_2$Omega_matrix+tau_mu+diag(1/tau,nrow = length(new_trees$tree_1$node_2$train_observations_index)),log = TRUE)
+          
+          
           # (log) Probability of accept the new proposed tree
           acceptance <- (l_new - l_old + log_transition)
           
@@ -938,32 +954,32 @@ gp_bart <- function(x_train, y, x_test,
         predictions_test[j, ]<- update_residuals_aux$residuals_test
         
         # To update phi
-        mh_update_phi <- update_phi_marginal(current_tree_iter = current_trees[[j]],
-                                             residuals = current_partial_residuals,
-                                             x_train = x_train,nu = nu_vector[j],
-                                             phi = phi_vector[j],
-                                             gp_variables = gp_variables,
-                                             likelihood_object = likelihood_object[[j]],
-                                             number_trees = number_trees,
-                                             discrete_phi = discrete_phi_boolean,
-                                             tau = tau,
-                                             tau_mu = tau_mu,
-                                             distance_min = distance_min,
-                                             distance_max = distance_max)
-        
-        # In case of accept the update over \phi update everything
-        if(mh_update_phi$phi_boolean) {
-          
-          # Updating the tree and the \phi object from the tree
-          current_trees[[j]] <- mh_update_phi$tree
-          
-          # Updating the likelihood objects
-          likelihood_object[[j]] <- mh_update_phi$likelihood_object
-          
-          # Updating the phi value
-          phi_vector[j] <- mh_update_phi$phi_proposal
-          
-        } # If doesn't accept, nothing changes.
+        # mh_update_phi <- update_phi_marginal(current_tree_iter = current_trees[[j]],
+        #                                      residuals = current_partial_residuals,
+        #                                      x_train = x_train,nu = nu_vector[j],
+        #                                      phi = phi_vector[j],
+        #                                      gp_variables = gp_variables,
+        #                                      likelihood_object = likelihood_object[[j]],
+        #                                      number_trees = number_trees,
+        #                                      discrete_phi = discrete_phi_boolean,
+        #                                      tau = tau,
+        #                                      tau_mu = tau_mu,
+        #                                      distance_min = distance_min,
+        #                                      distance_max = distance_max)
+        # 
+        # # In case of accept the update over \phi update everything
+        # if(mh_update_phi$phi_boolean) {
+        # 
+        #   # Updating the tree and the \phi object from the tree
+        #   current_trees[[j]] <- mh_update_phi$tree
+        # 
+        #   # Updating the likelihood objects
+        #   likelihood_object[[j]] <- mh_update_phi$likelihood_object
+        # 
+        #   # Updating the phi value
+        #   phi_vector[j] <- mh_update_phi$phi_proposal
+        # 
+        # } # If doesn't accept, nothing changes.
         
         
         
@@ -978,6 +994,22 @@ gp_bart <- function(x_train, y, x_test,
                              y = y_scale,
                              y_hat = colSums(predictions),
                              curr_tau = tau)
+    
+    if(!bart_boolean){
+      phi_vector_aux <- optim(par = runif(n = 1,
+                          min = distance_min,
+                          max = distance_max),
+                          method = "L-BFGS-B",
+                          lower = distance_min+.Machine$double.eps,
+                          upper = distance_max,
+                          fn = log_like_partial_length_parameter,
+                          squared_distance_matrix = distance_matrix_x,
+                          nu = nu_vector[1],
+                          tau = tau,
+                          y = y_scale)$par
+      
+      phi_vector <- rep(phi_vector_aux,number_trees)
+    }
     
   } # End of Loop through the n_inter
   cat("\n")
