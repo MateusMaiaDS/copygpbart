@@ -179,12 +179,13 @@ rate_tau <- function(x, # X value
 }
 
 # Normalize BART function (Same way as theOdds code)
-normalize_bart <- function(y) {
+normalize_bart <- function(y, a = NULL, b = NULL) {
 
   # Defining the a and b
-  a <- min(y)
-  b <- max(y)
-
+  if( is.null(a) & is.null(b)){
+    a <- min(y)
+    b <- max(y)
+  }
   # This will normalize y between -0.5 and 0.5
   y  <- (y - a)/(b - a) - 0.5
     return(y)

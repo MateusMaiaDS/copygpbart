@@ -309,7 +309,7 @@ gp_bart <- function(x_train, y, x_test,
                     K_bart = 2,
                     prob_tau = 0.9,
                     kappa = 0.5,
-                    phi_vector = rep(1, number_trees),
+                    phi_vector = rep(0.3, number_trees),
                     bart_boolean = TRUE,
                     bart_number_iter = 250) {
   
@@ -334,20 +334,38 @@ gp_bart <- function(x_train, y, x_test,
   
   # Scaling the x
   if(x_scale){
+    
+    # Getting the x values
+    x_train_min <- apply(x_train,2,min)
+    x_train_max <- apply(x_train,2,max)
+    
+    # Getting the training original
     x_train_original <- x_train
     x_test_original <- x_test
     
-    # Scaled version
-    xscale <- scale(x_train)
+    # # Creating the xscale_train/test
+    xscale_train <- x_train
+    xscale_test <- x_test
+
+    # Normalize all the columns
+    for(i in 1:ncol(x_train)){
+      xscale_train[,i] <- normalize_bart(y = x_train[,i],a = x_train_min[i],b = x_train_max[i])
+      xscale_test[,i] <- normalize_bart(y = x_test[,i],a = x_train_min[i],b = x_train_max[i])
+    }
     
-    mean_x <- attr(xscale,"scaled:center")
-    sd_x <- attr(xscale,"scaled:scale")
+    # Scaled version ( Std. version)
+    # xscale <- scale(x_train)
+    # 
+    # mean_x <- attr(xscale,"scaled:center")
+    # sd_x <- attr(xscale,"scaled:scale")
+    # 
+    # xscale_train <- scale(x_train,center = mean_x,scale = sd_x)
+    # xscale_test <- scale(x_test, center = mean_x, scale = sd_x)
+    # 
     
-    xscale_train <- scale(x_train,center = mean_x,scale = sd_x)
-    xscale_test <- scale(x_test, center = mean_x, scale = sd_x)
-    
-    x_train <- as.matrix(x_train)
-    x_test <- as.matrix(x_test)
+    # The result of scaling
+    x_train <- as.matrix(xscale_train)
+    x_test <- as.matrix(xscale_test)
     
   } else{
     x_train_original <- x_train
@@ -995,21 +1013,21 @@ gp_bart <- function(x_train, y, x_test,
                              y_hat = colSums(predictions),
                              curr_tau = tau)
     
-    if(!bart_boolean){
-      phi_vector_aux <- optim(par = runif(n = 1,
-                          min = distance_min,
-                          max = distance_max),
-                          method = "L-BFGS-B",
-                          lower = distance_min+.Machine$double.eps,
-                          upper = distance_max,
-                          fn = log_like_partial_length_parameter,
-                          squared_distance_matrix = distance_matrix_x,
-                          nu = nu_vector[1],
-                          tau = tau,
-                          y = y_scale)$par
-      
-      phi_vector <- rep(phi_vector_aux,number_trees)
-    }
+    # if(!bart_boolean){
+    #   phi_vector_aux <- optim(par = runif(n = 1,
+    #                       min = distance_min,
+    #                       max = distance_max),
+    #                       method = "L-BFGS-B",
+    #                       lower = distance_min+.Machine$double.eps,
+    #                       upper = distance_max,
+    #                       fn = log_like_partial_length_parameter,
+    #                       squared_distance_matrix = distance_matrix_x,
+    #                       nu = nu_vector[1],
+    #                       tau = tau,
+    #                       y = y_scale)$par
+    # 
+    #   phi_vector <- rep(phi_vector_aux,number_trees)
+    # }
     
   } # End of Loop through the n_inter
   cat("\n")
