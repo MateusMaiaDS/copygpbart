@@ -336,8 +336,8 @@ gp_bart <- function(x_train, y, x_test,
   if(x_scale){
     
     # Getting the x values
-    x_train_min <- apply(x_train,2,min)
-    x_train_max <- apply(x_train,2,max)
+    x_min <- apply(rbind(x_train,x_test),2,min)
+    x_max <- apply(rbind(x_train,x_test),2,max)
     
     # Getting the training original
     x_train_original <- x_train
@@ -349,8 +349,8 @@ gp_bart <- function(x_train, y, x_test,
 
     # Normalize all the columns
     for(i in 1:ncol(x_train)){
-      xscale_train[,i] <- normalize_bart(y = x_train[,i],a = x_train_min[i],b = x_train_max[i])
-      xscale_test[,i] <- normalize_bart(y = x_test[,i],a = x_train_min[i],b = x_train_max[i])
+      xscale_train[,i] <- normalize_bart(y = x_train[,i],a = x_min[i],b = x_max[i])
+      xscale_test[,i] <- normalize_bart(y = x_test[,i],a = x_min[i],b = x_max[i])
     }
     
     # Scaled version ( Std. version)
