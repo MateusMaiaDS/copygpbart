@@ -302,7 +302,7 @@ gp_bart <- function(x_train, y, x_test,
                     # This will be defining the nu the default value
                     nu_vector = NULL,
                     a_tau = 3, # Prior from a_v_ratio gamma
-                    d_tau = 1, # Prior from d_v_ratio gamma,
+                    # d_tau = 1, # Prior from d_v_ratio gamma,
                     discrete_phi_boolean = FALSE,
                     x_scale =  TRUE,
                     gp_variables = colnames(x_train),   # Selecting the GP-Variables
@@ -336,8 +336,8 @@ gp_bart <- function(x_train, y, x_test,
   if(x_scale){
     
     # Getting the x values
-    x_min <- apply(rbind(x_train,x_test),2,min)
-    x_max <- apply(rbind(x_train,x_test),2,max)
+    x_min <- apply(rbind(x_train),2,min)
+    x_max <- apply(rbind(x_train),2,max)
     
     # Getting the training original
     x_train_original <- x_train
@@ -1008,10 +1008,16 @@ gp_bart <- function(x_train, y, x_test,
       } # End of Loop through the trees
     }
     
-    tau <- update_tau_linero(x_train = x_train,
-                             y = y_scale,
-                             y_hat = colSums(predictions),
-                             curr_tau = tau)
+    # tau <- update_tau_linero(x_train = x_train,
+    #                          y = y_scale,
+    #                          y_hat = colSums(predictions),
+    #                          curr_tau = tau)
+    
+    tau <- update_tau( x = x_train,
+                       y = y,
+                       a_tau = a_tau,
+                       d_tau = d_tau,
+                       predictions = colSums(predictions))
     
     # if(!bart_boolean){
     #   phi_vector_aux <- optim(par = runif(n = 1,
