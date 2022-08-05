@@ -89,7 +89,7 @@ zero_tau_prob <- function(x, naive_tau_value, prob, shape) {
   # Find the zero to the function P(tau < tau_ols) = 0.1, for a defined
   return(stats::pgamma(naive_tau_value,
                 shape = shape,
-                scale = x) - (1 - prob))
+                rate = x) - (1 - prob))
 }
 
 zero_tau_prob_squared <- function(x, naive_tau_value, prob, shape) {
@@ -97,7 +97,7 @@ zero_tau_prob_squared <- function(x, naive_tau_value, prob, shape) {
   # Find the zero to the function P(tau < tau_ols) = 0.1, for a defined
   return((stats::pgamma(naive_tau_value,
                  shape = shape,
-                 scale = x) - (1 - prob))^2)
+                 rate = x) - (1 - prob))^2)
 }
 
 # Naive tau_estimation
@@ -164,7 +164,7 @@ rate_tau <- function(x, # X value
                        y = y)
 
   # Getting the root
-  min_root <-  try(stats::uniroot(f = zero_tau_prob, interval = c(1e-2, 100),
+  min_root <-  try(stats::uniroot(f = zero_tau_prob, interval = c(1e-3, 1000),
                            naive_tau_value = tau_ols,
                            prob = prob, shape = shape)$root, silent = TRUE)
 

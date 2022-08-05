@@ -301,7 +301,7 @@ gp_bart <- function(x_train, y, x_test,
                     scale_boolean = TRUE,
                     # This will be defining the nu the default value
                     nu_vector = NULL,
-                    a_tau = 3, # Prior from a_v_ratio gamma
+                    a_tau = 1.5, # Prior from a_v_ratio gamma
                     # d_tau = 1, # Prior from d_v_ratio gamma,
                     discrete_phi_boolean = FALSE,
                     x_scale =  TRUE,
@@ -422,7 +422,7 @@ gp_bart <- function(x_train, y, x_test,
                       y = y_scale,
                       prob = prob_tau,
                       shape = a_tau)
-    
+
   } else {
     
     # Not scaling the y
@@ -565,7 +565,6 @@ gp_bart <- function(x_train, y, x_test,
       
       # Getting the posterior for y_hat_train
       y_hat_store[curr, ] <- if(scale_boolean){
-        
         # Getting the unnormalized version from tau
         unnormalize_bart(colSums(predictions),a = a_min,b = b_max)
       } else {
@@ -1014,7 +1013,7 @@ gp_bart <- function(x_train, y, x_test,
     #                          curr_tau = tau)
     
     tau <- update_tau( x = x_train,
-                       y = y,
+                       y = y_scale,
                        a_tau = a_tau,
                        d_tau = d_tau,
                        predictions = colSums(predictions))
