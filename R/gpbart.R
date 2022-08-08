@@ -349,8 +349,8 @@ gp_bart <- function(x_train, y, x_test,
 
     # Normalize all the columns
     for(i in 1:ncol(x_train)){
-      xscale_train[,i] <- normalize_bart(y = x_train[,i],a = x_min[i],b = x_max[i])
-      xscale_test[,i] <- normalize_bart(y = x_test[,i],a = x_min[i],b = x_max[i])
+      xscale_train[,i] <- normalize_covariates_bart(y = x_train[,i],a = x_min[i],b = x_max[i])
+      xscale_test[,i] <- normalize_covariates_bart(y = x_test[,i],a = x_min[i],b = x_max[i])
     }
     
     # Scaled version ( Std. version)

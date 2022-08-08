@@ -204,6 +204,35 @@ rmse <- function(obs, pred) {
   return(sqrt(mean((obs - pred)^2)))
 }
 
+
+# Normalize BART function (Same way ONLY THE COVARIATE NOW)
+normalize_covariates_bart <- function(y, a = NULL, b = NULL) {
+  
+  # Defining the a and b
+  if( is.null(a) & is.null(b)){
+    a <- min(y)
+    b <- max(y)
+  }
+  # This will normalize y between -0.5 and 0.5
+  y  <- (y - a)/(b - a) 
+  return(y)
+}
+
+# Now a function to return everything back to the normal scale
+
+unnormalize_covariates_bart <- function(z, a, b) {
+  # Just getting back to the regular BART
+  y <- (b - a) * (z) + a
+  return(y)
+}
+
+
+# Calculating RMSE
+#' @export
+rmse <- function(obs, pred) {
+  return(sqrt(mean((obs - pred)^2)))
+}
+
 rMVN_var <- function(mean, Sigma) {
   if(length(mean) == 1){
     mean <- rep(mean,nrow(Sigma))
