@@ -5,7 +5,7 @@
 # Objects to test the tree_complete_conditional function
 # ==================================#
 
-tree_complete_conditional_gpbart <- function(tree, residuals, nu = 1, phi = 1,
+tree_complete_conditional_gpbart <- function(tree, residuals, nu = 1, 
                                              tau_mu,
                                              number_trees = number_trees) {
   
@@ -37,8 +37,8 @@ tree_complete_conditional_gpbart <- function(tree, residuals, nu = 1, phi = 1,
   
   # Defining RT_Omega_I_R
   RTR <- unlist(mapply(terminal_nodes, residuals_terminal_nodes,
-                       FUN = function(nodes, resid, x=nodes$Omega_plus_I_inv) {
-                         if(nodes$is_Omega_diag) sum(resid^2 * diag(x)) else crossprod(resid, crossprod(x, resid))
+                       FUN = function(nodes, resid) {
+                         if(nodes$is_Omega_diag) sum(resid^2 * diag(x)) else crossprod(resid, crossprod(nodes$Omega_plus_I_inv, resid))
                        }, SIMPLIFY = FALSE))
   
   # The term R^{T} solve(Omega + I ) 1
@@ -191,7 +191,7 @@ update_mu <- function(tree,
 update_residuals <- function(tree,
                              x_train,
                              x_test,
-                             nu, phi, residuals, tau) {
+                             nu, residuals, tau) {
   
   # New g (new vector prediction for g)
   residuals_train_new <- rep(NA, nrow(x_train))
@@ -212,31 +212,43 @@ update_residuals <- function(tree,
   # Getting the \mu_{j} vector
   mu_values <- vapply(terminal_nodes, "[[", numeric(1), "mu")
   
-  train_distance_matrix_node <- lapply(terminal_nodes, function(z) {
-    symm_distance_matrix(m1 = x_train[z$train_observations_index,,drop = FALSE])
+  
+  # Defining the kernel function
+  phi_vec <- lapply(terminal_nodes, function(node){apply(x_train[node$train_observations_index,,drop = FALSE],2,function(y){abs(diff(range(y)))/(2*pi*1)})})
+  
+  train_distance_matrix_node <- mapply(terminal_nodes,phi_vec,FUN =  function(z,phi_values) {
+    symm_distance_matrix(m1 = x_train[z$train_observations_index,,drop = FALSE],phi_vector = phi_values)
   })
   
   train_residuals_sample <- mapply(terminal_nodes,
                                    residuals_terminal_nodes,
                                    mu_values,
-                                   train_distance_matrix_node,
-                                   FUN = function(node,resid_val,mu_val,d_m_node)
+                                   FUN = function(node,resid_val,mu_val)
                                    {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
                                                           x_star = x_train[node$train_observations_index,,drop = FALSE],
                                                           y_train = (resid_val-mu_val),
-                                                          tau = tau,phi = phi,nu = nu,
-                                                          distance_matrix_train = d_m_node,get_sample = FALSE)$mu_pred},SIMPLIFY = FALSE)
+                                                          tau = tau,nu = nu,
+                                                          get_sample = TRUE)$mu_pred},SIMPLIFY = FALSE)
+  
+  # Debugging the function
+  # current_node <- terminal_nodes$node_0
+  # resid_value <- residuals_terminal_nodes$node_0
+  # mu_val <- mu_values[1]
+  # 
+  # x_train <- x_train[current_node$train_observations_index,,drop = FALSE]
+  # x_star <- x_train[current_node$train_observations_index,,drop = FALSE]
+  # y_train <- resid_value - mu_val
+  # get_sample <- TRUE
+  
   
   test_residuals_sample <- mapply(terminal_nodes,
                                   residuals_terminal_nodes,
                                   mu_values,
-                                  train_distance_matrix_node,
-                                  FUN = function(node,resid_val,mu_val,d_m_node)
+                                  FUN = function(node,resid_val,mu_val)
                                   {mu_val + gp_main_slow(x_train = x_train[node$train_observations_index,,drop = FALSE],
                                                          x_star = x_test[node$test_observations_index,,drop = FALSE],
                                                          y_train = (resid_val-mu_val),
-                                                         tau = tau,phi = phi,nu = nu,
-                                                         distance_matrix_train = d_m_node,get_sample = TRUE)$mu_pred},SIMPLIFY = FALSE)
+                                                         tau = tau,nu = nu,get_sample = TRUE)$mu_pred},SIMPLIFY = FALSE)
   
   # Adding the mu values calculated
   for(i in seq_along(terminal_nodes)) {
@@ -272,7 +284,6 @@ update_residuals <- function(tree,
 #' @param scale_boolean Boolean to scale or not the response \eqn{y}
 #' @param a_tau Scale parameter from \eqn{\tau} prior
 #' @param d_tau Rate parameter from \eqn{\tau} prior
-#' @param discrete_phi_boolean Boolean to decide if it will be used a discrete grid for \eqn{\phi} proposals
 #' @param x_scale Boolean to scale x or not
 #' @param nu_vector A constant vector of length of number of trees with the \eqn{\nu} constant value
 #' @param gp_variables Covariates used to build the covariance matrix from GP
@@ -303,13 +314,11 @@ gp_bart <- function(x_train, y, x_test,
                     nu_vector = NULL,
                     a_tau = 1.5, # Prior from a_v_ratio gamma
                     # d_tau = 1, # Prior from d_v_ratio gamma,
-                    discrete_phi_boolean = FALSE,
                     x_scale =  TRUE,
                     gp_variables = colnames(x_train),   # Selecting the GP-Variables
                     K_bart = 2,
                     prob_tau = 0.9,
                     kappa = 0.5,
-                    phi_vector = rep(0.3, number_trees),
                     bart_boolean = TRUE,
                     bart_number_iter = 250) {
   
@@ -381,11 +390,7 @@ gp_bart <- function(x_train, y, x_test,
     kappa <- kappa + 2*.Machine$double.eps
   }
   
-  # Getting the maximum and minimum values from a distance matrix
-  distance_matrix_x <- symm_distance_matrix(m1 = x_train[,gp_variables, drop = FALSE])
-  distance_range <- range(distance_matrix_x[upper.tri(distance_matrix_x)])
-  distance_min <- sqrt(distance_range[1])
-  distance_max <- sqrt(distance_range[2])
+
   
   # Setting seed
   set.seed(seed)
@@ -484,9 +489,6 @@ gp_bart <- function(x_train, y, x_test,
     stop("Insert a valid \\nu vector for the number of trees")
   }
   
-  if(length(phi_vector) != number_trees) {
-    stop("Insert a valid \\phi vector for the number of trees")
-  }
   
   # Recommendation about the min_node_size
   if(node_min_size < 15) {
@@ -517,8 +519,7 @@ gp_bart <- function(x_train, y, x_test,
   full_cond_store <-
     phi_store <-
     phi_proposal_store <- matrix(NA, ncol = number_trees, nrow = store_size)
-  phi_vector_proposal <- rep(0.1, number_trees)
-  
+
   # Creating the list of trees stumps
   for(i in seq_len(number_trees)) {
     # Creating the fixed two split trees
@@ -590,8 +591,6 @@ gp_bart <- function(x_train, y, x_test,
         predictions
       }
       
-      phi_store[curr, ] <- phi_vector
-      phi_proposal_store[curr, ] <- phi_vector_proposal
       verb_store_list[[curr]] <- verb_store
     }
     
@@ -822,21 +821,19 @@ gp_bart <- function(x_train, y, x_test,
           # Getting the inverse for the current terminal nodes
           current_trees[[j]] <- inverse_omega_plus_I(tree = current_trees[[j]],
                                                      x_train = x_train, tau = tau,
-                                                     nu = nu_vector[j],
-                                                     phi = phi_vector[j])
+                                                     nu = nu_vector[j])
           
           # Getting the inverse for the new tree terminal nodes
           new_trees[[j]] <- inverse_omega_plus_I(tree = new_trees[[j]],
                                                  x_train = x_train,tau = tau,
-                                                 nu = nu_vector[j],
-                                                 phi = phi_vector[j])
+                                                 nu = nu_vector[j])
           
           # Calculating the likelihood of the new tree
           likelihood_new <- tree_complete_conditional_gpbart(
             tree = new_trees[[j]],  # Calculate the full conditional
             residuals = current_partial_residuals,
             tau_mu = tau_mu,
-            nu = nu_vector[j], phi = phi_vector[j],
+            nu = nu_vector[j], 
             number_trees = number_trees
           )
           
@@ -845,7 +842,7 @@ gp_bart <- function(x_train, y, x_test,
             tree = current_trees[[j]], # Calculate the full conditional
             residuals = current_partial_residuals,
             tau_mu = tau_mu,
-            nu = nu_vector[j], phi = phi_vector[j],
+            nu = nu_vector[j],
             number_trees = number_trees
           )
           
@@ -902,8 +899,7 @@ gp_bart <- function(x_train, y, x_test,
             # Getting the inverse for the current terminal nodes
             current_trees[[j]] <- new_trees[[j]] <- inverse_omega_plus_I(tree = current_trees[[j]],
                                                                          x_train = x_train, tau = tau,
-                                                                         nu = nu_vector[j],
-                                                                         phi = phi_vector[j])
+                                                                         nu = nu_vector[j])
             
             # Creating the likelihood object
             likelihood_new <- likelihood_old <-
@@ -911,7 +907,7 @@ gp_bart <- function(x_train, y, x_test,
                 tree = current_trees[[j]], # Calculate the full conditional
                 residuals = current_partial_residuals,
                 tau_mu = tau_mu,
-                nu = nu_vector[j], phi = phi_vector[j],
+                nu = nu_vector[j],
                 number_trees = number_trees
               )
           } else{ # Replacing the likelihood_object
@@ -964,7 +960,7 @@ gp_bart <- function(x_train, y, x_test,
           tree = current_trees[[j]],
           x_train = x_train,x_test = x_test,
           residuals = current_partial_residuals,
-          phi = phi_vector[j], nu = nu_vector[j], tau = tau
+          nu = nu_vector[j], tau = tau
         )
         
         predictions[j, ] <- update_residuals_aux$residuals_train
@@ -1052,8 +1048,6 @@ gp_bart <- function(x_train, y, x_test,
                   loglike_fixed_tree_residuals_matrix = loglike_fixed_tree_residuals_matrix,
                   loglike_tree_residuals_matrix = loglike_tree_residuals_matrix,
                   full_cond = full_cond_store,
-                  phi_store = phi_store,
-                  phi_proposal_store = phi_proposal_store,
                   nu_vector = nu_vector,
                   y = y_scale,
                   X = x_train_original,
@@ -1062,7 +1056,6 @@ gp_bart <- function(x_train, y, x_test,
                   sd_x = sd_x,
                   scale_boolean = scale_boolean,
                   acc_ratio = acc_ratio,
-                  acc_ratio_phi = acc_ratio_phi,
                   iter = n_iter,
                   burn = burn,
                   thin = thin,
@@ -1083,59 +1076,59 @@ gp_bart <- function(x_train, y, x_test,
 }
 
 # #Do a MH for PHI
-update_phi_marginal <- function(x_train, current_tree_iter,residuals,
-                                seed = NULL,
-                                tau,
-                                tau_mu,
-                                phi, nu,number_trees,
-                                likelihood_object, p, gp_variables,
-                                discrete_phi = TRUE,
-                                distance_min,
-                                distance_max) {
-  
-  # Increased the range of tree proposal
-  if(discrete_phi){
-    phi_proposal <- sample(c(0.1,0.5,1,5,10), size = 1)
-  } else {
-    phi_proposal <- stats::runif(1, min = distance_min, max = distance_max)
-  }
-  
-  # Calculating the likelihood from the new step
-  tree_from_phi_proposal <- inverse_omega_plus_I(tree = current_tree_iter,
-                                                 x_train = x_train,nu = nu, tau = tau,
-                                                 phi = phi_proposal, gp_variables = gp_variables)
-  
-  likelihood_phi_proposal <- tree_complete_conditional_gpbart(tree = tree_from_phi_proposal,
-                                                              residuals = residuals,
-                                                              nu = nu, tau_mu = tau_mu,
-                                                              phi = phi_proposal,
-                                                              number_trees = number_trees)
-  
-  # Old phi likelhood
-  l_old_phi <- likelihood_object$log_posterior
-  
-  # Proposal likelihood
-  l_proposal_phi <- likelihood_phi_proposal$log_posterior
-  
-  # (log) Probability of accept the new proposed tree
-  acceptance_phi <- l_proposal_phi - l_old_phi
-  
-  # If storage for phi
-  
-  if(acceptance_phi > 0 || acceptance_phi > -stats::rexp(1)) { #
-    
-    # Nu boolean to see if was accepted or not
-    phi_boolean <- TRUE
-    return(list(phi_boolean = phi_boolean,
-                likelihood_object = likelihood_phi_proposal,
-                tree = tree_from_phi_proposal,
-                phi_proposal = phi_proposal)) # Returning the proposal value for phi
-  } else {
-    # Case of not accepting
-    phi_boolean <- FALSE
-    return(list(phi_boolean = phi_boolean)) # Returning the old value for phi
-  } #
-}
+# update_phi_marginal <- function(x_train, current_tree_iter,residuals,
+#                                 seed = NULL,
+#                                 tau,
+#                                 tau_mu,
+#                                 nu,number_trees,
+#                                 likelihood_object, p, gp_variables,
+#                                 discrete_phi = TRUE,
+#                                 distance_min,
+#                                 distance_max) {
+#   
+#   # Increased the range of tree proposal
+#   if(discrete_phi){
+#     phi_proposal <- sample(c(0.1,0.5,1,5,10), size = 1)
+#   } else {
+#     phi_proposal <- stats::runif(1, min = distance_min, max = distance_max)
+#   }
+#   
+#   # Calculating the likelihood from the new step
+#   tree_from_phi_proposal <- inverse_omega_plus_I(tree = current_tree_iter,
+#                                                  x_train = x_train,nu = nu, tau = tau,
+#                                                  phi = phi_proposal, gp_variables = gp_variables)
+#   
+#   likelihood_phi_proposal <- tree_complete_conditional_gpbart(tree = tree_from_phi_proposal,
+#                                                               residuals = residuals,
+#                                                               nu = nu, tau_mu = tau_mu,
+#                                                               phi = phi_proposal,
+#                                                               number_trees = number_trees)
+#   
+#   # Old phi likelhood
+#   l_old_phi <- likelihood_object$log_posterior
+#   
+#   # Proposal likelihood
+#   l_proposal_phi <- likelihood_phi_proposal$log_posterior
+#   
+#   # (log) Probability of accept the new proposed tree
+#   acceptance_phi <- l_proposal_phi - l_old_phi
+#   
+#   # If storage for phi
+#   
+#   if(acceptance_phi > 0 || acceptance_phi > -stats::rexp(1)) { #
+#     
+#     # Nu boolean to see if was accepted or not
+#     phi_boolean <- TRUE
+#     return(list(phi_boolean = phi_boolean,
+#                 likelihood_object = likelihood_phi_proposal,
+#                 tree = tree_from_phi_proposal,
+#                 phi_proposal = phi_proposal)) # Returning the proposal value for phi
+#   } else {
+#     # Case of not accepting
+#     phi_boolean <- FALSE
+#     return(list(phi_boolean = phi_boolean)) # Returning the old value for phi
+#   } #
+# }
 
 
 # Function to return the depth trees
@@ -1255,7 +1248,7 @@ get_mu_values <- function(gpbart_model) {
 # Getting Omega Inverse + Diag Inverse
 inverse_omega_plus_I <- function(tree,
                                  x_train ,
-                                 nu, phi,
+                                 nu, 
                                  tau,
                                  number_trees = number_trees,
                                  gp_variables = colnames(x_train)  # Selecting which gp-variables to use
@@ -1275,16 +1268,18 @@ inverse_omega_plus_I <- function(tree,
     length(x$train_observations_index)
   })
   
+  # Defining the kernel function
+  phi_vec <- lapply(terminal_nodes, function(node){apply(x_train[node$train_observations_index,,drop = FALSE],2,function(y){abs(diff(range(y)))/(2*pi*1)})})
+  
   # Calculating Omega matrix INVERSE
-  distance_matrices <- mapply(terminal_nodes, FUN = function(y) {
-    symm_distance_matrix(matrix(x_train[y$train_observations_index, gp_variables], nrow = length(y$train_observations_index)))
+  distance_matrices <- mapply(terminal_nodes,phi_vec, FUN = function(y,z) {
+    symm_distance_matrix(matrix(x_train[y$train_observations_index, gp_variables], nrow = length(y$train_observations_index)),phi_vector = z)
   }, SIMPLIFY = FALSE)
   
   # Calculating Omega
   Omega_matrix <- mapply(distance_matrices, FUN = function(dist_m) {
-    kernel_function(
-      squared_distance_matrix = dist_m,
-      nu = nu, phi = phi)
+    kernel_function(squared_distance_matrix_phi = dist_m,
+      nu = nu)
   }, SIMPLIFY = FALSE)
   
   # Checking if diagonal
@@ -1308,6 +1303,7 @@ inverse_omega_plus_I <- function(tree,
     tree[[names_terminal_nodes[i]]]$Omega_matrix <- Omega_matrix[[names_terminal_nodes[i]]]
     tree[[names_terminal_nodes[i]]]$is_Omega_diag <- is_Omega_diag[[names_terminal_nodes[i]]]
   }
+  
   return(tree)
 }
 
